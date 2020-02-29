@@ -55,6 +55,7 @@ constexpr auto populate_debug_messenger_create_info() noexcept
       .pUserData = nullptr,
   };
 }
+
 #endif
 
 } // anonymous namespace
@@ -115,5 +116,23 @@ create_instance(const char* title,
 
   return instance;
 }
+
+#ifdef VULKAN_HELPER_ENABLE_VALIDATION_LAYER
+[[nodiscard]] auto create_debug_messenger(VkInstance instance) noexcept
+    -> VkDebugUtilsMessengerEXT
+{
+
+  const VkDebugUtilsMessengerCreateInfoEXT create_info =
+      populate_debug_messenger_create_info();
+
+  VkDebugUtilsMessengerEXT debug_mesenger;
+  auto result = vkCreateDebugUtilsMessengerEXT(instance, &create_info, nullptr,
+                                               &debug_mesenger);
+  if (result != VK_SUCCESS) {
+    vkh::panic("failed to set up debug messenger!");
+  }
+  return debug_mesenger;
+}
+#endif
 
 } // namespace vkh

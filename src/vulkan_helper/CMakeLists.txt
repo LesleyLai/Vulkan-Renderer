@@ -20,8 +20,8 @@ set_property(CACHE VULKAN_HELPER_ENABLE_VALIDATION_LAYER PROPERTY STRINGS AUTO O
 
 if (VULKAN_HELPER_ENABLE_VALIDATION_LAYER STREQUAL "AUTO")
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
-        target_compile_definitions(vulkan_helper PRIVATE VULKAN_HELPER_ENABLE_VALIDATION_LAYER)
+        target_compile_definitions(vulkan_helper PUBLIC VULKAN_HELPER_ENABLE_VALIDATION_LAYER)
     endif ()
 elseif (VULKAN_HELPER_ENABLE_VALIDATION_LAYER STREQUAL "ON")
-    target_compile_definitions(vulkan_helper PRIVATE VULKAN_HELPER_ENABLE_VALIDATION_LAYER)
+    target_compile_definitions(vulkan_helper PUBLIC VULKAN_HELPER_ENABLE_VALIDATION_LAYER)
 endif ()
