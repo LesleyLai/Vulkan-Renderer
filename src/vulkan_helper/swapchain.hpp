@@ -23,16 +23,16 @@ struct SwapchainSupportDetails {
                                            VkSurfaceKHR surface) noexcept
     -> SwapchainSupportDetails;
 
-class VulkanSwapchain {
+class Swapchain {
 public:
-  VulkanSwapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
-                  const QueueFamilyIndices& indices);
-  ~VulkanSwapchain();
+  Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
+            const QueueFamilyIndices& indices);
+  ~Swapchain();
 
-  VulkanSwapchain(const VulkanSwapchain&) = delete;
-  auto operator=(const VulkanSwapchain&) -> VulkanSwapchain& = delete;
+  Swapchain(const Swapchain&) = delete;
+  auto operator=(const Swapchain&) -> Swapchain& = delete;
 
-  VulkanSwapchain(VulkanSwapchain&& other) noexcept
+  Swapchain(Swapchain&& other) noexcept
       : device_{std::exchange(other.device_, nullptr)},
         swapchain_{std::exchange(other.swapchain_, nullptr)},
         swapchain_images_{std::move(other.swapchain_images_)},
@@ -44,7 +44,7 @@ public:
   {
   }
 
-  auto operator=(VulkanSwapchain&& other) & noexcept -> VulkanSwapchain&
+  auto operator=(Swapchain&& other) & noexcept -> Swapchain&
   {
     device_ = std::exchange(other.device_, nullptr);
     swapchain_ = std::exchange(other.swapchain_, nullptr);

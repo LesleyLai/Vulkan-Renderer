@@ -74,9 +74,8 @@ namespace vkh {
   return details;
 }
 
-VulkanSwapchain::VulkanSwapchain(VkPhysicalDevice pd, VkDevice device,
-                                 VkSurfaceKHR surface,
-                                 const QueueFamilyIndices& indices)
+Swapchain::Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
+                     const QueueFamilyIndices& indices)
     : device_{device}
 {
   const auto swapchain_support = query_swapchain_support(pd, surface);
@@ -165,7 +164,7 @@ VulkanSwapchain::VulkanSwapchain(VkPhysicalDevice pd, VkDevice device,
   }
 }
 
-VulkanSwapchain::~VulkanSwapchain()
+Swapchain::~Swapchain()
 {
   for (auto view : swapchain_image_views_) {
     vkDestroyImageView(device_, view, nullptr);

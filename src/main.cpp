@@ -225,9 +225,14 @@ auto main() -> int
     vkh::panic("Cannot create an allocator for vulkan");
   }
 
-  while (!window.should_close()) {
-    window.poll_events();
-    window.swap_buffers();
+  {
+    vkh::Swapchain swapchain(physical_device, device, surface,
+                             queue_family_indices);
+
+    while (!window.should_close()) {
+      window.poll_events();
+      window.swap_buffers();
+    }
   }
 
   vmaDestroyAllocator(allocator);
