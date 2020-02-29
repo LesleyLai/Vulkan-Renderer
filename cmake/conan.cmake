@@ -10,7 +10,7 @@ macro(run_conan)
     conan_add_remote(NAME bincrafters URL
             https://api.bintray.com/conan/bincrafters/public-conan)
 
-    conan_cmake_run(REQUIRES Catch2/2.11.1@catchorg/stable
+    conan_cmake_run(CONANFILE conanfile.txt
             BASIC_SETUP CMAKE_TARGETS
             BUILD missing)
 endmacro()

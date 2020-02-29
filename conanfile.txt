@@ -1,0 +1,8 @@
+[requires]
+glfw/3.3@bincrafters/stable
+stb/20180214@conan/stable
+jsonformoderncpp/3.7.3@vthiery/stable
+
+[generators]
+cmake
+

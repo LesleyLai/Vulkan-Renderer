@@ -12,4 +12,5 @@ include("cmake/StaticAnalyzers.cmake")
 include("cmake/conan.cmake")
 run_conan()
 
+add_subdirectory(third-party)
 add_subdirectory(src)

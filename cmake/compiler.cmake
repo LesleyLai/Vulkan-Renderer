@@ -11,6 +11,7 @@ add_library(compiler_options INTERFACE)
 
 option(VULKAN_RENDERER_WARNING_AS_ERROR "Treats compiler warnings as errors" ON)
 if(MSVC)
+  add_compile_definitions(NOMINMAX)
   target_compile_options(compiler_options INTERFACE /W4 "/permissive-")
   if(VULKAN_RENDERER_WARNING_AS_ERROR)
     target_compile_options(compiler_options INTERFACE /WX)

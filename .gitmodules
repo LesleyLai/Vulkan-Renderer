@@ -1,0 +1,9 @@
+[submodule "third-party/volk"]
+	path = third-party/volk
+	url = https://github.com/zeux/volk.git
+[submodule "third-party/VulkanMemoryAllocator"]
+	path = third-party/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git
+[submodule "third-party/beyond-core"]
+	path = third-party/beyond-core
+	url = https://github.com/Beyond-Engine/Core.git
