@@ -7,6 +7,7 @@
 #include "beyond/core/utils/panic.hpp"
 
 #include "vulkan_helper/instance.hpp"
+#include "vulkan_helper/panic.hpp"
 #include "vulkan_helper/queue_indices.hpp"
 #include "vulkan_helper/swapchain.hpp"
 #include "vulkan_helper/utils.hpp"
@@ -113,11 +114,62 @@ check_device_extension_support(VkPhysicalDevice device) noexcept -> bool
 
   VkPhysicalDeviceProperties properties;
   vkGetPhysicalDeviceProperties(physical_device, &properties);
-  fmt::print("GPU: {}\n", properties.deviceName);
+  std::printf("GPU: %s\n", properties.deviceName);
   std::fflush(stdout);
 
   // Returns the pair with highest score
   return physical_device;
+}
+
+[[nodiscard]] auto
+create_logical_device(VkPhysicalDevice pd,
+                      const vkh::QueueFamilyIndices& indices) noexcept
+    -> VkDevice
+{
+  const auto unique_indices = indices.to_set();
+
+  std::vector<VkDeviceQueueCreateInfo> queue_create_infos;
+  queue_create_infos.resize(unique_indices.size());
+
+  float queue_priority = 1.0f;
+  std::transform(std::begin(unique_indices), std::end(unique_indices),
+                 std::begin(queue_create_infos), [&](uint32_t index) {
+                   return VkDeviceQueueCreateInfo{
+                       .sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
+                       .pNext = nullptr,
+                       .flags = 0,
+                       .queueFamilyIndex = index,
+                       .queueCount = 1,
+                       .pQueuePriorities = &queue_priority,
+                   };
+                 });
+
+  const VkPhysicalDeviceFeatures features = {};
+
+  const VkDeviceCreateInfo create_info{
+      .sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .queueCreateInfoCount = vkh::to_u32(queue_create_infos.size()),
+      .pQueueCreateInfos = queue_create_infos.data(),
+#ifdef VULKAN_HELPER_ENABLE_VALIDATION_LAYER
+      .enabledLayerCount = vkh::to_u32(vkh::validation_layers.size()),
+      .ppEnabledLayerNames = vkh::validation_layers.data(),
+#else
+      .enabledLayerCount = 0,
+      .ppEnabledLayerNames = nullptr,
+#endif
+      .enabledExtensionCount = vkh::to_u32(device_extensions.size()),
+      .ppEnabledExtensionNames = device_extensions.data(),
+      .pEnabledFeatures = &features,
+  };
+
+  VkDevice device = nullptr;
+  if (vkCreateDevice(pd, &create_info, nullptr, &device) != VK_SUCCESS) {
+    vkh::panic("Vulkan: failed to create logical device!");
+  }
+
+  return device;
 }
 
 } // anonymous namespace
@@ -141,14 +193,45 @@ auto main() -> int
 #endif
 
   const auto physical_device = pick_physical_device(instance, surface);
-  [[maybe_unused]] const auto queue_family_indices =
-      vkh::find_queue_families(physical_device, surface);
+  const auto queue_family_indices = [&]() {
+    auto indices = vkh::find_queue_families(physical_device, surface);
+    if (!indices) {
+      vkh::panic("Cannot find a physical device that satisfy all the queue "
+                 "family indices requirements");
+    }
+    return *indices;
+  }();
+
+  auto device = create_logical_device(physical_device, queue_family_indices);
+  volkLoadDevice(device);
+
+  //  const auto get_device_queue = [device](std::uint32_t family_index,
+  //                                         std::uint32_t index) {
+  //    VkQueue queue;
+  //    vkGetDeviceQueue(device, family_index, index, &queue);
+  //    return queue;
+  //  };
+  //  auto graphics_queue =
+  //      get_device_queue(queue_family_indices.graphics_family, 0);
+  //  auto present_queue = get_device_queue(queue_family_indices.present_family,
+  //  0); auto compute_queue =
+  //  get_device_queue(queue_family_indices.compute_family, 0);
+
+  VmaAllocatorCreateInfo allocator_info{};
+  allocator_info.physicalDevice = physical_device;
+  allocator_info.device = device;
+  VmaAllocator allocator;
+  if (vmaCreateAllocator(&allocator_info, &allocator) != VK_SUCCESS) {
+    vkh::panic("Cannot create an allocator for vulkan");
+  }
 
   while (!window.should_close()) {
     window.poll_events();
     window.swap_buffers();
   }
 
+  vmaDestroyAllocator(allocator);
+  vkDestroyDevice(device, nullptr);
 #ifdef VULKAN_HELPER_ENABLE_VALIDATION_LAYER
   vkDestroyDebugUtilsMessengerEXT(instance, debug_messenger, nullptr);
 #endif

@@ -5,6 +5,7 @@
 
 #include <volk.h>
 
+#include <array>
 #include <vector>
 
 namespace vkh {
@@ -15,6 +16,8 @@ create_instance(const char* title,
     -> VkInstance;
 
 #ifdef VULKAN_HELPER_ENABLE_VALIDATION_LAYER
+constexpr std::array validation_layers{"VK_LAYER_KHRONOS_validation"};
+
 [[nodiscard]] auto create_debug_messenger(VkInstance instance) noexcept
     -> VkDebugUtilsMessengerEXT;
 #endif

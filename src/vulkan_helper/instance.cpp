@@ -9,15 +9,13 @@
 namespace {
 
 #ifdef VULKAN_HELPER_ENABLE_VALIDATION_LAYER
-constexpr std::array validation_layers = {"VK_LAYER_KHRONOS_validation"};
-
 auto check_validation_layer_support() noexcept -> bool
 {
   const auto available = vkh::get_vector_with<VkLayerProperties>(
       vkEnumerateInstanceLayerProperties);
 
   return std::all_of(
-      std::begin(validation_layers), std::end(validation_layers),
+      std::begin(vkh::validation_layers), std::end(vkh::validation_layers),
       [&](const char* layer_name) {
         return std::find_if(std::begin(available), std::end(available),
                             [&](const auto& layer_properties) {
@@ -97,8 +95,8 @@ create_instance(const char* title,
 
 #ifdef VULKAN_HELPER_ENABLE_VALIDATION_LAYER
   create_info.enabledLayerCount =
-      static_cast<uint32_t>(validation_layers.size());
-  create_info.ppEnabledLayerNames = validation_layers.data();
+      static_cast<uint32_t>(vkh::validation_layers.size());
+  create_info.ppEnabledLayerNames = vkh::validation_layers.data();
 
   VkDebugUtilsMessengerCreateInfoEXT debug_create_info =
       populate_debug_messenger_create_info();
