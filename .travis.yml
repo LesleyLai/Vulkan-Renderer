@@ -1,0 +1,101 @@
+language: cpp
+sudo: require
+
+linux: &linux
+  os: linux
+  dist: bionic
+  language: python
+  python: "3.8"
+  install:
+    - pip install conan cmake
+    - wget -qO - http://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo apt-key add -
+    - sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-1.2.131-bionic.list http://packages.lunarg.com/vulkan/1.2.131/lunarg-vulkan-1.2.131-bionic.list
+    - sudo apt update
+    - sudo apt install vulkan-sdk
+  script:
+    - mkdir build && cd build
+    - cmake  -G Ninja .. $CMAKE_OPTIONS
+    - cmake --build .
+
+matrix:
+  include:
+    - <<: *linux
+      compiler: gcc
+      name: GCC 9
+      env: CC="/usr/bin/gcc-9" CXX="/usr/bin/g++-9" CMAKE_OPTIONS="-DCMAKE_BUILD_TYPE=Release"
+      addons:
+        apt:
+          sources:
+            - sourceline: 'ppa:ubuntu-toolchain-r/test'
+          packages:
+            - g++-9
+            - ninja-build
+      before_script:
+        - sudo ln -s /usr/bin/gcc-9 /usr/local/bin/gcc
+        - sudo ln -s /usr/bin/g++-9 /usr/local/bin/g++
+
+
+    - <<: *linux
+      compiler: clang
+      name: Clang 9
+      env:
+        - CC="/usr/bin/clang-9"
+        - CXX="/usr/bin/clang++-9"
+        - CMAKE_OPTIONS="-DCMAKE_BUILD_TYPE=Release"
+      addons:
+        apt:
+          packages:
+            - g++-9
+            - clang-9
+            - ninja-build
+      before_script:
+        - sudo ln -s /usr/bin/clang-9 /usr/local/bin/clang
+        - sudo ln -s /usr/bin/clang++-9 /usr/local/bin/clang++
+
+    - <<: *linux
+      compiler: clang
+      name: Clang 9 with ASAN and UBSAN
+      env:
+        - CC="/usr/bin/clang-9"
+        - CXX="/usr/bin/clang++-9"
+        - CMAKE_OPTIONS="-DCMAKE_BUILD_TYPE=DEBUG -DVULKAN_RENDERER_USE_ASAN=ON -DVULKAN_RENDERER_USE_UBSAN=ON"
+      addons:
+        apt:
+          packages:
+            - g++-9
+            - clang-9
+            - ninja-build
+      before_script:
+        - sudo ln -s /usr/bin/clang-9 /usr/local/bin/clang
+        - sudo ln -s /usr/bin/clang++-9 /usr/local/bin/clang++
+
+    - <<: *linux
+      compiler: clang
+      name: Clang 9 with TSAN
+      env:
+        - CC="/usr/bin/clang-9"
+        - CXX="/usr/bin/clang++-9"
+        - CMAKE_OPTIONS="-DCMAKE_BUILD_TYPE=DEBUG -DVULKAN_RENDERER_USE_TSAN=ON"
+      addons:
+        apt:
+          packages:
+            - g++-9
+            - clang-9
+            - ninja-build
+      before_script:
+        - sudo ln -s /usr/bin/clang-9 /usr/local/bin/clang
+        - sudo ln -s /usr/bin/clang++-9 /usr/local/bin/clang++
+
+    #
+    # Git Check
+    #
+    - os: linux
+      name: git-check
+      script:
+        - |
+          if [[ -n $(git diff --check HEAD^) ]]; then
+            echo "You must remove whitespace before submitting a pull request"
+            echo ""
+            git diff --check HEAD^
+            exit -1
+          fi
