@@ -1,12 +1,12 @@
 #pragma once
 
-#ifndef BEYOND_VULKAN_HELPER_UTILS_HPP
-#define BEYOND_VULKAN_HELPER_UTILS_HPP
+#ifndef VULKAN_HELPER_UTILS_HPP
+#define VULKAN_HELPER_UTILS_HPP
 
 #include <cstdint>
 #include <vector>
 
-namespace beyond::vkh {
+namespace vkh {
 
 /// @brief Transforms the two stage query vulkan function into directly return
 /// vector
@@ -27,6 +27,6 @@ template <typename T> constexpr auto to_u32(T value) noexcept -> std::uint32_t
   return static_cast<std::uint32_t>(value);
 }
 
-} // namespace beyond::vkh
+} // namespace vkh
 
-#endif // BEYOND_VULKAN_HELPER_UTILS_HPP
+#endif // VULKAN_HELPER_UTILS_HPP

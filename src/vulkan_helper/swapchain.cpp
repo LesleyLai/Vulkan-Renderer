@@ -1,19 +1,18 @@
-#include "vulkan_swapchain.hpp"
-#include "vulkan_utils.hpp"
-
-#include <beyond/core/utils/panic.hpp>
+#include "swapchain.hpp"
+#include "panic.hpp"
+#include "utils.hpp"
 
 #include <algorithm>
-#include <gsl/span>
 #include <limits>
+#include <vector>
 
 static constexpr std::uint32_t width = 1024;
 static constexpr std::uint32_t height = 768;
 
 namespace {
 
-[[nodiscard]] auto choose_surface_format(
-    const gsl::span<const VkSurfaceFormatKHR> available_formats)
+[[nodiscard]] auto
+choose_surface_format(const std::vector<VkSurfaceFormatKHR>& available_formats)
 {
   const auto prefered = std::find_if(
       std::begin(available_formats), std::end(available_formats),
@@ -27,7 +26,7 @@ namespace {
 }
 
 [[nodiscard]] auto
-choose_present_mode(const gsl::span<const VkPresentModeKHR> available_modes)
+choose_present_mode(const std::vector<VkPresentModeKHR>& available_modes)
 {
   const auto preferred =
       std::find(std::begin(available_modes), std::end(available_modes),
@@ -50,9 +49,9 @@ choose_present_mode(const gsl::span<const VkPresentModeKHR> available_modes)
   }
 }
 
-} // namespace
+} // anonymous namespace
 
-namespace beyond::vkh {
+namespace vkh {
 
 [[nodiscard]] auto query_swapchain_support(VkPhysicalDevice device,
                                            VkSurfaceKHR surface) noexcept
@@ -124,7 +123,7 @@ VulkanSwapchain::VulkanSwapchain(VkPhysicalDevice pd, VkDevice device,
 
   if (vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain_) !=
       VK_SUCCESS) {
-    beyond::panic("Cannot create swapchain!");
+    vkh::panic("Cannot create swapchain!");
   }
 
   swapchain_images_ = vkh::get_vector_with<VkImage>(
@@ -161,10 +160,10 @@ VulkanSwapchain::VulkanSwapchain(VkPhysicalDevice pd, VkDevice device,
 
     if (vkCreateImageView(device, &view_create_info, nullptr,
                           &swapchain_image_views_[i]) != VK_SUCCESS) {
-      beyond::panic("Failed to create swapchain image views!");
+      vkh::panic("Failed to create swapchain image views!");
     }
   }
-} // namespace beyond::graphics::vulkan
+}
 
 VulkanSwapchain::~VulkanSwapchain()
 {
@@ -174,4 +173,4 @@ VulkanSwapchain::~VulkanSwapchain()
   vkDestroySwapchainKHR(device_, swapchain_, nullptr);
 }
 
-} // namespace beyond::vkh
+} // namespace vkh

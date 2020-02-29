@@ -1,7 +1,7 @@
-#include "vulkan_queue_indices.hpp"
-#include "vulkan_utils.hpp"
+#include "queue_indices.hpp"
+#include "utils.hpp"
 
-namespace beyond::vkh {
+namespace vkh {
 
 auto find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface) noexcept
     -> std::optional<QueueFamilyIndices>
@@ -44,4 +44,4 @@ auto find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface) noexcept
   return {};
 }
 
-} // namespace beyond::vkh
+} // namespace vkh

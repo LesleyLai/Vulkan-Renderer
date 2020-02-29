@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef BEYOND_VULKAN_HELPER_SWAPCHAIN_HPP
-#define BEYOND_VULKAN_HELPER_SWAPCHAIN_HPP
+#ifndef VULKAN_HELPER_SWAPCHAIN_HPP
+#define VULKAN_HELPER_SWAPCHAIN_HPP
 
 #include <volk.h>
 
@@ -9,9 +9,9 @@
 #include <set>
 #include <vector>
 
-#include "vulkan_queue_indices.hpp"
+#include "queue_indices.hpp"
 
-namespace beyond::vkh {
+namespace vkh {
 
 struct SwapchainSupportDetails {
   VkSurfaceCapabilitiesKHR capabilities;
@@ -67,6 +67,6 @@ private:
   VkExtent2D swapchain_extent_{};
 };
 
-} // namespace beyond::vkh
+} // namespace vkh
 
-#endif // BEYOND_VULKAN_HELPER_SWAPCHAIN_HPP
+#endif // VULKAN_HELPER_SWAPCHAIN_HPP
