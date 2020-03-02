@@ -166,10 +166,23 @@ Swapchain::Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
 
 Swapchain::~Swapchain()
 {
-  for (auto view : swapchain_image_views_) {
-    vkDestroyImageView(device_, view, nullptr);
+  reset();
+}
+
+void Swapchain::reset() noexcept
+{
+  if (swapchain_ != nullptr) {
+    for (auto view : swapchain_image_views_) {
+      vkDestroyImageView(device_, view, nullptr);
+    }
+    vkDestroySwapchainKHR(device_, swapchain_, nullptr);
   }
-  vkDestroySwapchainKHR(device_, swapchain_, nullptr);
+  device_ = nullptr;
+  swapchain_ = nullptr;
+  swapchain_images_.clear();
+  swapchain_image_views_.clear();
+  swapchain_images_format_ = VK_FORMAT_UNDEFINED;
+  swapchain_extent_ = {};
 }
 
 } // namespace vkh

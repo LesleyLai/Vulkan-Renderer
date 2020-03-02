@@ -9,6 +9,7 @@
 #include "vulkan_helper/instance.hpp"
 #include "vulkan_helper/panic.hpp"
 #include "vulkan_helper/queue_indices.hpp"
+#include "vulkan_helper/shader_module.hpp"
 #include "vulkan_helper/swapchain.hpp"
 #include "vulkan_helper/utils.hpp"
 
@@ -16,6 +17,12 @@
 
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
+
+#define VKH_CHECK(call)                                                        \
+  do {                                                                         \
+    [[maybe_unused]] VkResult result = call;                                   \
+    assert(result == VK_SUCCESS);                                              \
+  } while (0)
 
 namespace {
 
@@ -205,17 +212,18 @@ auto main() -> int
   auto device = create_logical_device(physical_device, queue_family_indices);
   volkLoadDevice(device);
 
-  //  const auto get_device_queue = [device](std::uint32_t family_index,
-  //                                         std::uint32_t index) {
-  //    VkQueue queue;
-  //    vkGetDeviceQueue(device, family_index, index, &queue);
-  //    return queue;
-  //  };
-  //  auto graphics_queue =
-  //      get_device_queue(queue_family_indices.graphics_family, 0);
-  //  auto present_queue = get_device_queue(queue_family_indices.present_family,
-  //  0); auto compute_queue =
-  //  get_device_queue(queue_family_indices.compute_family, 0);
+  const auto get_device_queue = [device](std::uint32_t family_index,
+                                         std::uint32_t index) {
+    VkQueue queue;
+    vkGetDeviceQueue(device, family_index, index, &queue);
+    return queue;
+  };
+  [[maybe_unused]] auto graphics_queue =
+      get_device_queue(queue_family_indices.graphics_family, 0);
+  [[maybe_unused]] auto present_queue =
+      get_device_queue(queue_family_indices.present_family, 0);
+  [[maybe_unused]] auto compute_queue =
+      get_device_queue(queue_family_indices.compute_family, 0);
 
   VmaAllocatorCreateInfo allocator_info{};
   allocator_info.physicalDevice = physical_device;
@@ -225,15 +233,23 @@ auto main() -> int
     vkh::panic("Cannot create an allocator for vulkan");
   }
 
-  {
-    vkh::Swapchain swapchain(physical_device, device, surface,
-                             queue_family_indices);
+  vkh::Swapchain swapchain(physical_device, device, surface,
+                           queue_family_indices);
 
-    while (!window.should_close()) {
-      window.poll_events();
-      window.swap_buffers();
-    }
+  auto vert_shader =
+      vkh::create_shader_module("shaders/shader.vert.spv", device);
+  auto frag_shader =
+      vkh::create_shader_module("shaders/shader.frag.spv", device);
+
+  while (!window.should_close()) {
+    window.poll_events();
+    window.swap_buffers();
   }
+
+  vkDestroyShaderModule(device, vert_shader, nullptr);
+  vkDestroyShaderModule(device, frag_shader, nullptr);
+
+  swapchain.reset();
 
   vmaDestroyAllocator(allocator);
   vkDestroyDevice(device, nullptr);

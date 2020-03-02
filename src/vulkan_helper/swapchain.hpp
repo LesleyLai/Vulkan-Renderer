@@ -25,6 +25,7 @@ struct SwapchainSupportDetails {
 
 class Swapchain {
 public:
+  Swapchain() = default;
   Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
             const QueueFamilyIndices& indices);
   ~Swapchain();
@@ -56,6 +57,8 @@ public:
         std::exchange(other.swapchain_extent_, VkExtent2D{0, 0});
     return *this;
   }
+
+  void reset() noexcept;
 
 private:
   VkDevice device_ = nullptr;

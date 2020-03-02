@@ -12,5 +12,16 @@ include("cmake/StaticAnalyzers.cmake")
 include("cmake/conan.cmake")
 run_conan()
 
+include(cmake/CompileShader.cmake)
+compile_shader(vertShader
+        SOURCE ${CMAKE_SOURCE_DIR}/shaders/shader.vert
+        TARGET ${CMAKE_BINARY_DIR}/bin/shaders/shader.vert.spv
+        )
+
+compile_shader(fragShader
+        SOURCE ${CMAKE_SOURCE_DIR}/shaders/shader.frag
+        TARGET ${CMAKE_BINARY_DIR}/bin/shaders/shader.frag.spv
+        )
+
 add_subdirectory(third-party)
 add_subdirectory(src)

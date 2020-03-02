@@ -3,6 +3,8 @@ add_library(vulkan_helper
         instance.cpp
         queue_indices.hpp
         queue_indices.cpp
+        shader_module.hpp
+        shader_module.cpp
         swapchain.hpp
         swapchain.cpp
         utils.hpp panic.cpp panic.hpp)
