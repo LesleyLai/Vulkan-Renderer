@@ -237,18 +237,17 @@ auto main() -> int
                            queue_family_indices);
 
   auto vert_shader =
-      vkh::create_shader_module("shaders/shader.vert.spv", device);
+      vkh::create_unique_shader_module("shaders/shader.vert.spv", device);
   auto frag_shader =
-      vkh::create_shader_module("shaders/shader.frag.spv", device);
+      vkh::create_unique_shader_module("shaders/shader.frag.spv", device);
 
   while (!window.should_close()) {
     window.poll_events();
     window.swap_buffers();
   }
 
-  vkDestroyShaderModule(device, vert_shader, nullptr);
-  vkDestroyShaderModule(device, frag_shader, nullptr);
-
+  vert_shader.reset();
+  frag_shader.reset();
   swapchain.reset();
 
   vmaDestroyAllocator(allocator);

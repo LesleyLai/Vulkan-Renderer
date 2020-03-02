@@ -35,19 +35,13 @@ namespace vkh {
                                         VkDevice device) -> VkShaderModule
 {
   const auto buffer = read_file(filename);
-  return create_shader_module(
-      buffer.size(), reinterpret_cast<const uint32_t*>(buffer.data()), device);
-}
 
-[[nodiscard]] auto create_shader_module(std::size_t size, const uint32_t* data,
-                                        VkDevice device) -> VkShaderModule
-{
   const VkShaderModuleCreateInfo create_info{
       .sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
-      .codeSize = size,
-      .pCode = data,
+      .codeSize = buffer.size(),
+      .pCode = reinterpret_cast<const uint32_t*>(buffer.data()),
   };
 
   VkShaderModule module;
@@ -59,6 +53,14 @@ namespace vkh {
   }
 
   return module;
+}
+
+[[nodiscard]] auto create_unique_shader_module(std::string_view filename,
+                                               VkDevice device)
+    -> UniqueShaderModule
+{
+  return UniqueShaderModule{device, create_shader_module(filename, device),
+                            nullptr};
 }
 
 } // namespace vkh

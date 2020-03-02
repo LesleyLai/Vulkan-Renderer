@@ -7,7 +7,7 @@ add_library(vulkan_helper
         shader_module.cpp
         swapchain.hpp
         swapchain.cpp
-        utils.hpp panic.cpp panic.hpp)
+        utils.hpp panic.cpp panic.hpp unique_resource.hpp)
 target_link_libraries(vulkan_helper
         PUBLIC
         third_party::vma
