@@ -60,6 +60,11 @@ public:
 
   void reset() noexcept;
 
+  [[nodiscard]] auto extent() const noexcept -> VkExtent2D
+  {
+    return swapchain_extent_;
+  }
+
 private:
   VkDevice device_ = nullptr;
   VkSwapchainKHR swapchain_ = nullptr;

@@ -21,7 +21,10 @@
 #define VKH_CHECK(call)                                                        \
   do {                                                                         \
     [[maybe_unused]] VkResult result = call;                                   \
-    assert(result == VK_SUCCESS);                                              \
+    if (result != VK_SUCCESS) {                                                \
+      ::vkh::panic(fmt::format("[{}:{}] Vulkan Fail at in {}\n", __FILE__,     \
+                               __LINE__, __func__));                           \
+    }                                                                          \
   } while (0)
 
 namespace {
@@ -179,6 +182,134 @@ create_logical_device(VkPhysicalDevice pd,
   return device;
 }
 
+struct PipelineInfo {
+  VkPipelineLayout pipeline_layout = nullptr;
+  VkPipeline pipeline = nullptr;
+};
+
+[[nodiscard]] auto create_graphics_pipeline(VkDevice device,
+                                            const vkh::Swapchain& swapchain)
+{
+  const auto vert_shader =
+      vkh::create_unique_shader_module("shaders/shader.vert.spv", device);
+  const auto frag_shader =
+      vkh::create_unique_shader_module("shaders/shader.frag.spv", device);
+
+  const VkPipelineShaderStageCreateInfo vert_shader_stage_info = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .stage = VK_SHADER_STAGE_VERTEX_BIT,
+      .module = vert_shader.get(),
+      .pName = "main",
+      .pSpecializationInfo = nullptr};
+
+  const VkPipelineShaderStageCreateInfo frag_shader_stage_info = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+      .module = frag_shader.get(),
+      .pName = "main",
+      .pSpecializationInfo = nullptr,
+  };
+
+  [[maybe_unused]] const VkPipelineShaderStageCreateInfo shader_stages[] = {
+      vert_shader_stage_info, frag_shader_stage_info};
+
+  [[maybe_unused]] VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .vertexBindingDescriptionCount = 0,
+      .pVertexBindingDescriptions = nullptr,
+      .vertexAttributeDescriptionCount = 0,
+      .pVertexAttributeDescriptions = nullptr,
+  };
+
+  [[maybe_unused]] const VkPipelineInputAssemblyStateCreateInfo inputAssembly =
+      {
+          .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+          .pNext = nullptr,
+          .flags = 0,
+          .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+          .primitiveRestartEnable = VK_FALSE,
+      };
+
+  const VkViewport viewport = {
+      .x = 0.0f,
+      .y = 0.0f,
+      .width = static_cast<float>(swapchain.extent().width),
+      .height = static_cast<float>(swapchain.extent().height),
+      .minDepth = 0.0f,
+      .maxDepth = 1.0f,
+  };
+
+  const VkRect2D scissor = {.offset = {0, 0}, .extent = swapchain.extent()};
+
+  [[maybe_unused]] VkPipelineViewportStateCreateInfo viewport_state = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .viewportCount = 1,
+      .pViewports = &viewport,
+      .scissorCount = 1,
+      .pScissors = &scissor,
+  };
+
+  [[maybe_unused]] VkPipelineRasterizationStateCreateInfo rasterizer = {};
+  rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
+  rasterizer.depthClampEnable = VK_FALSE;
+  rasterizer.rasterizerDiscardEnable = VK_FALSE;
+  rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
+  rasterizer.lineWidth = 1.0f;
+  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
+  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
+  rasterizer.depthBiasEnable = VK_FALSE;
+
+  [[maybe_unused]] VkPipelineMultisampleStateCreateInfo multisampling = {};
+  multisampling.sType =
+      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
+  multisampling.sampleShadingEnable = VK_FALSE;
+  multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+
+  [[maybe_unused]] VkPipelineColorBlendAttachmentState colorBlendAttachment =
+      {};
+  colorBlendAttachment.colorWriteMask =
+      VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT |
+      VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
+  colorBlendAttachment.blendEnable = VK_FALSE;
+
+  [[maybe_unused]] const VkPipelineColorBlendStateCreateInfo colorBlending = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .logicOpEnable = VK_FALSE,
+      .logicOp = VK_LOGIC_OP_COPY,
+      .attachmentCount = 1,
+      .pAttachments = &colorBlendAttachment,
+      .blendConstants = {0.0f, 0.0f, 0.0f, 0.0f},
+  };
+
+  const VkPipelineLayoutCreateInfo pipeline_layout_create_info = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .setLayoutCount = 0,
+      .pSetLayouts = nullptr,
+      .pushConstantRangeCount = 0,
+      .pPushConstantRanges = nullptr,
+  };
+
+  VkPipelineLayout pipeline_layout;
+  VKH_CHECK(vkCreatePipelineLayout(device, &pipeline_layout_create_info,
+                                   nullptr, &pipeline_layout));
+
+  // Do something
+  return PipelineInfo{pipeline_layout, nullptr};
+
+} // namespace
+
 } // anonymous namespace
 
 auto main() -> int
@@ -229,25 +360,22 @@ auto main() -> int
   allocator_info.physicalDevice = physical_device;
   allocator_info.device = device;
   VmaAllocator allocator;
-  if (vmaCreateAllocator(&allocator_info, &allocator) != VK_SUCCESS) {
-    vkh::panic("Cannot create an allocator for vulkan");
-  }
+
+  VKH_CHECK(vmaCreateAllocator(&allocator_info, &allocator));
 
   vkh::Swapchain swapchain(physical_device, device, surface,
                            queue_family_indices);
 
-  auto vert_shader =
-      vkh::create_unique_shader_module("shaders/shader.vert.spv", device);
-  auto frag_shader =
-      vkh::create_unique_shader_module("shaders/shader.frag.spv", device);
+  auto [pipeline_layout, pipeline] =
+      create_graphics_pipeline(device, swapchain);
 
   while (!window.should_close()) {
     window.poll_events();
     window.swap_buffers();
   }
 
-  vert_shader.reset();
-  frag_shader.reset();
+  vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+
   swapchain.reset();
 
   vmaDestroyAllocator(allocator);

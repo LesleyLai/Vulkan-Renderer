@@ -59,12 +59,12 @@ public:
     resource_ = nullptr;
   }
 
-  auto get() noexcept -> T
+  auto get() const noexcept -> T
   {
     return resource_;
   }
 
-  explicit operator T() noexcept
+  explicit operator T() const noexcept
   {
     return resource_;
   }
