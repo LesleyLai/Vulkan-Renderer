@@ -187,8 +187,58 @@ struct PipelineInfo {
   VkPipeline pipeline = nullptr;
 };
 
+[[nodiscard]] auto create_render_pass(VkDevice device,
+                                      const vkh::Swapchain& swapchain)
+    -> VkRenderPass
+{
+  const VkAttachmentDescription color_attachment = {
+      .flags = 0,
+      .format = swapchain.image_format(),
+      .samples = VK_SAMPLE_COUNT_1_BIT,
+      .loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
+      .storeOp = VK_ATTACHMENT_STORE_OP_STORE,
+      .stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
+      .stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
+      .initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
+      .finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR,
+  };
+
+  const VkAttachmentReference color_attachment_ref = {
+      .attachment = 0, .layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL};
+
+  const VkSubpassDescription subpass = {
+      .flags = 0,
+      .pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
+      .inputAttachmentCount = 0,
+      .pInputAttachments = nullptr,
+      .colorAttachmentCount = 1,
+      .pColorAttachments = &color_attachment_ref,
+      .pResolveAttachments = nullptr,
+      .pDepthStencilAttachment = nullptr,
+      .preserveAttachmentCount = 0,
+      .pPreserveAttachments = nullptr,
+  };
+
+  const VkRenderPassCreateInfo create_info = {
+      .sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .attachmentCount = 1,
+      .pAttachments = &color_attachment,
+      .subpassCount = 1,
+      .pSubpasses = &subpass,
+      .dependencyCount = 0,
+      .pDependencies = nullptr,
+  };
+
+  VkRenderPass render_pass;
+  VKH_CHECK(vkCreateRenderPass(device, &create_info, nullptr, &render_pass));
+  return render_pass;
+} // namespace
+
 [[nodiscard]] auto create_graphics_pipeline(VkDevice device,
-                                            const vkh::Swapchain& swapchain)
+                                            const vkh::Swapchain& swapchain,
+                                            VkRenderPass renderPass)
 {
   const auto vert_shader =
       vkh::create_unique_shader_module("shaders/shader.vert.spv", device);
@@ -214,10 +264,10 @@ struct PipelineInfo {
       .pSpecializationInfo = nullptr,
   };
 
-  [[maybe_unused]] const VkPipelineShaderStageCreateInfo shader_stages[] = {
-      vert_shader_stage_info, frag_shader_stage_info};
+  const std::array shader_stages = {vert_shader_stage_info,
+                                    frag_shader_stage_info};
 
-  [[maybe_unused]] VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
+  const VkPipelineVertexInputStateCreateInfo vertexInputInfo = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -227,14 +277,13 @@ struct PipelineInfo {
       .pVertexAttributeDescriptions = nullptr,
   };
 
-  [[maybe_unused]] const VkPipelineInputAssemblyStateCreateInfo inputAssembly =
-      {
-          .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-          .pNext = nullptr,
-          .flags = 0,
-          .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
-          .primitiveRestartEnable = VK_FALSE,
-      };
+  const VkPipelineInputAssemblyStateCreateInfo inputAssembly = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+      .primitiveRestartEnable = VK_FALSE,
+  };
 
   const VkViewport viewport = {
       .x = 0.0f,
@@ -247,7 +296,7 @@ struct PipelineInfo {
 
   const VkRect2D scissor = {.offset = {0, 0}, .extent = swapchain.extent()};
 
-  [[maybe_unused]] VkPipelineViewportStateCreateInfo viewport_state = {
+  const VkPipelineViewportStateCreateInfo viewport_state = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_VIEWPORT_STATE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -257,21 +306,35 @@ struct PipelineInfo {
       .pScissors = &scissor,
   };
 
-  [[maybe_unused]] VkPipelineRasterizationStateCreateInfo rasterizer = {};
-  rasterizer.sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO;
-  rasterizer.depthClampEnable = VK_FALSE;
-  rasterizer.rasterizerDiscardEnable = VK_FALSE;
-  rasterizer.polygonMode = VK_POLYGON_MODE_FILL;
-  rasterizer.lineWidth = 1.0f;
-  rasterizer.cullMode = VK_CULL_MODE_BACK_BIT;
-  rasterizer.frontFace = VK_FRONT_FACE_CLOCKWISE;
-  rasterizer.depthBiasEnable = VK_FALSE;
+  const VkPipelineRasterizationStateCreateInfo rasterizer = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_RASTERIZATION_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .depthClampEnable = VK_FALSE,
+      .rasterizerDiscardEnable = VK_FALSE,
+      .polygonMode = VK_POLYGON_MODE_FILL,
+      .cullMode = VK_CULL_MODE_BACK_BIT,
+      .frontFace = VK_FRONT_FACE_CLOCKWISE,
 
-  [[maybe_unused]] VkPipelineMultisampleStateCreateInfo multisampling = {};
-  multisampling.sType =
-      VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
-  multisampling.sampleShadingEnable = VK_FALSE;
-  multisampling.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
+      .depthBiasEnable = VK_FALSE,
+      .depthBiasConstantFactor = 0.0f,
+      .depthBiasClamp = 0.0f,
+      .depthBiasSlopeFactor = 0.0f,
+
+      .lineWidth = 1.0f,
+  };
+
+  const VkPipelineMultisampleStateCreateInfo multisampling = {
+      .sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .rasterizationSamples = VK_SAMPLE_COUNT_1_BIT,
+      .sampleShadingEnable = VK_FALSE,
+      .minSampleShading = 0,
+      .pSampleMask = nullptr,
+      .alphaToCoverageEnable = VK_FALSE,
+      .alphaToOneEnable = VK_FALSE,
+  };
 
   [[maybe_unused]] VkPipelineColorBlendAttachmentState colorBlendAttachment =
       {};
@@ -280,7 +343,7 @@ struct PipelineInfo {
       VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT;
   colorBlendAttachment.blendEnable = VK_FALSE;
 
-  [[maybe_unused]] const VkPipelineColorBlendStateCreateInfo colorBlending = {
+  const VkPipelineColorBlendStateCreateInfo colorBlending = {
       .sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO,
       .pNext = nullptr,
       .flags = 0,
@@ -305,8 +368,27 @@ struct PipelineInfo {
   VKH_CHECK(vkCreatePipelineLayout(device, &pipeline_layout_create_info,
                                    nullptr, &pipeline_layout));
 
+  VkGraphicsPipelineCreateInfo pipelineInfo = {};
+  pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
+  pipelineInfo.stageCount = vkh::to_u32(shader_stages.size());
+  pipelineInfo.pStages = shader_stages.data();
+  pipelineInfo.pVertexInputState = &vertexInputInfo;
+  pipelineInfo.pInputAssemblyState = &inputAssembly;
+  pipelineInfo.pViewportState = &viewport_state;
+  pipelineInfo.pRasterizationState = &rasterizer;
+  pipelineInfo.pMultisampleState = &multisampling;
+  pipelineInfo.pColorBlendState = &colorBlending;
+  pipelineInfo.layout = pipeline_layout;
+  pipelineInfo.renderPass = renderPass;
+  pipelineInfo.subpass = 0;
+  pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+
+  VkPipeline pipeline;
+  VKH_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo,
+                                      nullptr, &pipeline));
+
   // Do something
-  return PipelineInfo{pipeline_layout, nullptr};
+  return PipelineInfo{pipeline_layout, pipeline};
 
 } // namespace
 
@@ -366,15 +448,18 @@ auto main() -> int
   vkh::Swapchain swapchain(physical_device, device, surface,
                            queue_family_indices);
 
+  auto render_pass = create_render_pass(device, swapchain);
   auto [pipeline_layout, pipeline] =
-      create_graphics_pipeline(device, swapchain);
+      create_graphics_pipeline(device, swapchain, render_pass);
 
   while (!window.should_close()) {
     window.poll_events();
     window.swap_buffers();
   }
 
+  vkDestroyPipeline(device, pipeline, nullptr);
   vkDestroyPipelineLayout(device, pipeline_layout, nullptr);
+  vkDestroyRenderPass(device, render_pass, nullptr);
 
   swapchain.reset();
 

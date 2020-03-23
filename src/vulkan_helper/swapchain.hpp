@@ -60,6 +60,11 @@ public:
 
   void reset() noexcept;
 
+  [[nodiscard]] auto image_format() const noexcept -> VkFormat
+  {
+    return swapchain_images_format_;
+  }
+
   [[nodiscard]] auto extent() const noexcept -> VkExtent2D
   {
     return swapchain_extent_;
