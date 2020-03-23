@@ -65,6 +65,12 @@ public:
     return swapchain_images_format_;
   }
 
+  [[nodiscard]] auto image_views() const noexcept
+      -> const std::vector<VkImageView>&
+  {
+    return swapchain_image_views_;
+  }
+
   [[nodiscard]] auto extent() const noexcept -> VkExtent2D
   {
     return swapchain_extent_;

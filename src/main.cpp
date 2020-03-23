@@ -368,29 +368,58 @@ struct PipelineInfo {
   VKH_CHECK(vkCreatePipelineLayout(device, &pipeline_layout_create_info,
                                    nullptr, &pipeline_layout));
 
-  VkGraphicsPipelineCreateInfo pipelineInfo = {};
-  pipelineInfo.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO;
-  pipelineInfo.stageCount = vkh::to_u32(shader_stages.size());
-  pipelineInfo.pStages = shader_stages.data();
-  pipelineInfo.pVertexInputState = &vertexInputInfo;
-  pipelineInfo.pInputAssemblyState = &inputAssembly;
-  pipelineInfo.pViewportState = &viewport_state;
-  pipelineInfo.pRasterizationState = &rasterizer;
-  pipelineInfo.pMultisampleState = &multisampling;
-  pipelineInfo.pColorBlendState = &colorBlending;
-  pipelineInfo.layout = pipeline_layout;
-  pipelineInfo.renderPass = renderPass;
-  pipelineInfo.subpass = 0;
-  pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+  const VkGraphicsPipelineCreateInfo pipeline_create_info = {
+      .sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
+      .pNext = nullptr,
+      .flags = 0,
+      .stageCount = vkh::to_u32(shader_stages.size()),
+      .pStages = shader_stages.data(),
+      .pVertexInputState = &vertexInputInfo,
+      .pInputAssemblyState = &inputAssembly,
+      .pViewportState = &viewport_state,
+      .pRasterizationState = &rasterizer,
+      .pMultisampleState = &multisampling,
+      .pColorBlendState = &colorBlending,
+      .layout = pipeline_layout,
+      .renderPass = renderPass,
+      .subpass = 0,
+      .basePipelineHandle = VK_NULL_HANDLE,
+  };
 
   VkPipeline pipeline;
-  VKH_CHECK(vkCreateGraphicsPipelines(device, VK_NULL_HANDLE, 1, &pipelineInfo,
-                                      nullptr, &pipeline));
+  VKH_CHECK(vkCreateGraphicsPipelines(
+      device, VK_NULL_HANDLE, 1, &pipeline_create_info, nullptr, &pipeline));
 
   // Do something
   return PipelineInfo{pipeline_layout, pipeline};
+}
 
-} // namespace
+[[nodiscard]] auto create_frame_buffers(const VkDevice device,
+                                        const vkh::Swapchain& swapchain,
+                                        const VkRenderPass render_pass)
+{
+  std::vector<VkFramebuffer> swapchain_frame_buffers;
+  swapchain_frame_buffers.resize(swapchain.image_views().size());
+
+  const auto& swapchain_image_views = swapchain.image_views();
+
+  VkFramebufferCreateInfo framebufferInfo = {};
+  framebufferInfo.sType = VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO;
+  framebufferInfo.renderPass = render_pass;
+  framebufferInfo.attachmentCount = 1;
+  framebufferInfo.width = swapchain.extent().width;
+  framebufferInfo.height = swapchain.extent().height;
+  framebufferInfo.layers = 1;
+
+  for (size_t i = 0; i < swapchain_image_views.size(); i++) {
+    VkImageView attachments[] = {swapchain_image_views[i]};
+    framebufferInfo.pAttachments = attachments;
+
+    VKH_CHECK(vkCreateFramebuffer(device, &framebufferInfo, nullptr,
+                                  &swapchain_frame_buffers[i]));
+  }
+  return swapchain_frame_buffers;
+}
 
 } // anonymous namespace
 
@@ -451,10 +480,17 @@ auto main() -> int
   auto render_pass = create_render_pass(device, swapchain);
   auto [pipeline_layout, pipeline] =
       create_graphics_pipeline(device, swapchain, render_pass);
+  auto framebuffers = create_frame_buffers(device, swapchain, render_pass);
+
+  // create_frame_buffers();
 
   while (!window.should_close()) {
     window.poll_events();
     window.swap_buffers();
+  }
+
+  for (auto framebuffer : framebuffers) {
+    vkDestroyFramebuffer(device, framebuffer, nullptr);
   }
 
   vkDestroyPipeline(device, pipeline, nullptr);
