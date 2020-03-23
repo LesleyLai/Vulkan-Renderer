@@ -60,9 +60,19 @@ public:
 
   void reset() noexcept;
 
+  [[nodiscard]] auto get() const noexcept -> VkSwapchainKHR
+  {
+    return swapchain_;
+  }
+
   [[nodiscard]] auto image_format() const noexcept -> VkFormat
   {
     return swapchain_images_format_;
+  }
+
+  [[nodiscard]] auto image() const noexcept -> const std::vector<VkImage>&
+  {
+    return swapchain_images_;
   }
 
   [[nodiscard]] auto image_views() const noexcept
