@@ -1,6 +1,7 @@
 #include "swapchain.hpp"
-#include "panic.hpp"
-#include "utils.hpp"
+#include "gpu_device.hpp"
+#include "vulkan_helper/panic.hpp"
+#include "vulkan_helper/utils.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -74,11 +75,12 @@ namespace vkh {
   return details;
 }
 
-Swapchain::Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
-                     const QueueFamilyIndices& indices)
-    : device_{device}
+} // namespace vkh
+
+Swapchain::Swapchain(const GPUDevice& device) : device_{device.vk_device()}
 {
-  const auto swapchain_support = query_swapchain_support(pd, surface);
+  const auto swapchain_support = vkh::query_swapchain_support(
+      device.vk_physical_device(), device.surface());
 
   const auto surface_format = choose_surface_format(swapchain_support.formats);
   const auto present_mode =
@@ -93,7 +95,7 @@ Swapchain::Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
 
   VkSwapchainCreateInfoKHR create_info{};
   create_info.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
-  create_info.surface = surface;
+  create_info.surface = device.surface();
   create_info.minImageCount = image_count;
   create_info.imageFormat = surface_format.format;
   create_info.imageColorSpace = surface_format.colorSpace;
@@ -101,10 +103,12 @@ Swapchain::Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
   create_info.imageArrayLayers = 1;
   create_info.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
 
-  std::array queue_family_indices = {indices.graphics_family,
-                                     indices.present_family};
+  std::array queue_family_indices = {
+      device.queue_family_indices().graphics_family,
+      device.queue_family_indices().present_family};
 
-  if (indices.graphics_family != indices.present_family) {
+  if (device.queue_family_indices().graphics_family !=
+      device.queue_family_indices().present_family) {
     create_info.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
     create_info.queueFamilyIndexCount =
         vkh::to_u32(queue_family_indices.size());
@@ -120,14 +124,14 @@ Swapchain::Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
   create_info.clipped = VK_TRUE;
   create_info.oldSwapchain = nullptr;
 
-  if (vkCreateSwapchainKHR(device, &create_info, nullptr, &swapchain_) !=
+  if (vkCreateSwapchainKHR(device_, &create_info, nullptr, &swapchain_) !=
       VK_SUCCESS) {
     vkh::panic("Cannot create swapchain!");
   }
 
-  swapchain_images_ = vkh::get_vector_with<VkImage>(
-      [device, this](uint32_t* count, VkImage* data) {
-        vkGetSwapchainImagesKHR(device, swapchain_, count, data);
+  swapchain_images_ =
+      vkh::get_vector_with<VkImage>([this](uint32_t* count, VkImage* data) {
+        vkGetSwapchainImagesKHR(device_, swapchain_, count, data);
       });
 
   swapchain_images_format_ = surface_format.format;
@@ -157,7 +161,7 @@ Swapchain::Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
             .layerCount = 1,
         }};
 
-    if (vkCreateImageView(device, &view_create_info, nullptr,
+    if (vkCreateImageView(device_, &view_create_info, nullptr,
                           &swapchain_image_views_[i]) != VK_SUCCESS) {
       vkh::panic("Failed to create swapchain image views!");
     }
@@ -184,5 +188,3 @@ void Swapchain::reset() noexcept
   swapchain_images_format_ = VK_FORMAT_UNDEFINED;
   swapchain_extent_ = {};
 }
-
-} // namespace vkh

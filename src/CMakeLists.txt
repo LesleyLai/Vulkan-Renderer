@@ -4,7 +4,12 @@ add_subdirectory(vulkan_helper)
 add_executable(app
         main.cpp
         window.hpp
-        window.cpp)
+        window.cpp
+        swapchain.hpp
+        swapchain.cpp
+        gpu_device.hpp
+        gpu_device.cpp
+        )
 target_link_libraries(app
         PRIVATE compiler_options
         vulkan_helper

@@ -9,7 +9,7 @@
 #include <set>
 #include <vector>
 
-#include "queue_indices.hpp"
+#include "vulkan_helper/queue_indices.hpp"
 
 namespace vkh {
 
@@ -22,12 +22,14 @@ struct SwapchainSupportDetails {
 [[nodiscard]] auto query_swapchain_support(VkPhysicalDevice device,
                                            VkSurfaceKHR surface) noexcept
     -> SwapchainSupportDetails;
+} // namespace vkh
+
+class GPUDevice;
 
 class Swapchain {
 public:
   Swapchain() = default;
-  Swapchain(VkPhysicalDevice pd, VkDevice device, VkSurfaceKHR surface,
-            const QueueFamilyIndices& indices);
+  explicit Swapchain(const GPUDevice& device);
   ~Swapchain();
 
   Swapchain(const Swapchain&) = delete;
@@ -95,7 +97,5 @@ private:
   VkFormat swapchain_images_format_ = VK_FORMAT_UNDEFINED;
   VkExtent2D swapchain_extent_{};
 };
-
-} // namespace vkh
 
 #endif // VULKAN_HELPER_SWAPCHAIN_HPP

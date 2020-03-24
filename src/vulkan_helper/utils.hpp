@@ -21,7 +21,7 @@ template <typename T, typename F> auto get_vector_with(F func) -> std::vector<T>
   return vec;
 }
 
-/// @brief Casts a number into `std::uint32_t`
+/// @brief Casts a number into `uint32_t`
 template <typename T> constexpr auto to_u32(T value) noexcept -> std::uint32_t
 {
   return static_cast<std::uint32_t>(value);

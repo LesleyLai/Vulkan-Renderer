@@ -1,17 +1,21 @@
 add_library(vulkan_helper
+        check.hpp
         instance.hpp
         instance.cpp
         queue_indices.hpp
         queue_indices.cpp
         shader_module.hpp
         shader_module.cpp
-        swapchain.hpp
-        swapchain.cpp
+        physical_device_picker.hpp
+        physical_device_picker.cpp
+        logical_device.hpp
+        logical_device.cpp
         utils.hpp panic.cpp panic.hpp unique_resource.hpp)
 target_link_libraries(vulkan_helper
         PUBLIC
         third_party::vma
         third_party::volk
+        CONAN_PKG::fmt
         PRIVATE
         compiler_options)
 add_clangformat(vulkan_helper)
