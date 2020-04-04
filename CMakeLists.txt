@@ -23,6 +23,14 @@ compile_shader(fragShader
         TARGET ${CMAKE_BINARY_DIR}/bin/shaders/shader.frag.spv
         )
 
+
+# Copy assets
+add_custom_target(assets
+        COMMAND ${CMAKE_COMMAND} -E copy_directory
+        ${CMAKE_SOURCE_DIR}/data ${CMAKE_BINARY_DIR}/bin
+        )
+
+
 add_subdirectory(third-party)
 add_subdirectory(src)
 
