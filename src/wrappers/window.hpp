@@ -58,8 +58,8 @@ public:
    * @param[out] surface The Vulkan surface to create
    */
   auto create_vulkan_surface(VkInstance instance,
-                             const VkAllocationCallbacks* allocator,
-                             VkSurfaceKHR& surface) noexcept -> void;
+                             const VkAllocationCallbacks* allocator) noexcept
+      -> VkSurfaceKHR;
 
 private:
   std::string title_;

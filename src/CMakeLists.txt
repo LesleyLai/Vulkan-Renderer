@@ -11,7 +11,7 @@ add_executable(app
         wrappers/window.cpp
         wrappers/gpu_device.hpp
         wrappers/gpu_device.cpp
-        )
+        utils/vma_source.cpp)
 target_link_libraries(app
         PRIVATE compiler_options
         #vulkan_helper

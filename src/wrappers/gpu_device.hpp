@@ -5,26 +5,19 @@
 
 #include <vulkan/vulkan.h>
 
-#include <vk_mem_alloc.h>
+#include "VkBootstrap.h"
 
-#include "queue_indices.hpp"
+#include <vk_mem_alloc.h>
 
 class Window;
 
-enum EnableValidationLayer { yes = 0, no = 1 };
+enum ValidationLayerSetting { enable = 0, disable = 1 };
 
 class GPUDevice {
-  VkInstance instance_;
-
-  EnableValidationLayer validation_layer_enabled_;
-
-  VkDebugUtilsMessengerEXT debug_messenger_;
-
+  vkb::Instance instance_;
   VkPhysicalDevice physical_device_;
   VkSurfaceKHR surface_;
   VkDevice device_;
-
-  QueueFamilyIndices queue_family_indices_;
 
   VkQueue graphics_queue_;
   VkQueue compute_queue_;
@@ -34,7 +27,8 @@ class GPUDevice {
 
 public:
   explicit GPUDevice(Window& window,
-                     EnableValidationLayer enable_validation_layer) noexcept;
+                     ValidationLayerSetting validation_layer_setting =
+                         ValidationLayerSetting::enable) noexcept;
   ~GPUDevice() noexcept;
 
   GPUDevice(const GPUDevice&) = delete;
@@ -45,7 +39,7 @@ public:
 
   [[nodiscard]] auto vk_instance() const noexcept -> VkInstance
   {
-    return instance_;
+    return instance_.instance;
   }
 
   [[nodiscard]] auto vk_physical_device() const noexcept -> VkPhysicalDevice
@@ -61,12 +55,6 @@ public:
   [[nodiscard]] auto surface() const noexcept -> VkSurfaceKHR
   {
     return surface_;
-  }
-
-  [[nodiscard]] auto queue_family_indices() const noexcept
-      -> const QueueFamilyIndices&
-  {
-    return queue_family_indices_;
   }
 
   [[nodiscard]] auto graphics_queue() const noexcept -> VkQueue
@@ -88,6 +76,8 @@ public:
   {
     return allocator_;
   }
+
+  auto wait_idle() const noexcept -> void;
 };
 
 #endif // VULKAN_RENDERER_GPU_DEVICE_HPP

@@ -87,12 +87,14 @@ auto Window::swap_buffers() noexcept -> void
   return extensions;
 }
 
-auto Window::create_vulkan_surface(VkInstance instance,
-                                   const VkAllocationCallbacks* allocator,
-                                   VkSurfaceKHR& surface) noexcept -> void
+auto Window::create_vulkan_surface(
+    VkInstance instance, const VkAllocationCallbacks* allocator) noexcept
+    -> VkSurfaceKHR
 {
+  VkSurfaceKHR surface;
   if (glfwCreateWindowSurface(instance, pimpl_->data_, allocator, &surface) !=
       VK_SUCCESS) {
     beyond::panic("Failed to create Vulkan window surface!");
   }
+  return surface;
 }
