@@ -5,8 +5,7 @@
 
 #include <vulkan/vulkan.h>
 
-#include "VkBootstrap.h"
-
+#include <VkBootstrap.h>
 #include <vk_mem_alloc.h>
 
 class Window;
@@ -18,6 +17,8 @@ class GPUDevice {
   VkPhysicalDevice physical_device_;
   VkSurfaceKHR surface_;
   VkDevice device_;
+
+  VkSampleCountFlagBits msaa_sample_count_;
 
   VkQueue graphics_queue_;
   VkQueue compute_queue_;
@@ -75,6 +76,11 @@ public:
   [[nodiscard]] auto allocator() const noexcept -> VmaAllocator
   {
     return allocator_;
+  }
+
+  [[nodiscard]] auto msaa_sample_count() const noexcept -> VkSampleCountFlagBits
+  {
+    return msaa_sample_count_;
   }
 
   auto wait_idle() const noexcept -> void;

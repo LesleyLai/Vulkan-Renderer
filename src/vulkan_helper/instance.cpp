@@ -2,9 +2,9 @@
 #include <cstring>
 #include <iostream>
 
+#include "../utils/utils.hpp"
 #include "instance.hpp"
 #include "panic.hpp"
-#include "utils.hpp"
 
 namespace {
 

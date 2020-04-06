@@ -172,8 +172,6 @@ private:
   Window window_;
   GPUDevice device_;
 
-  VkSampleCountFlagBits msaaSamples = VK_SAMPLE_COUNT_1_BIT;
-
   VkSwapchainKHR swapChain;
   std::vector<VkImage> swapChainImages;
   VkFormat swapChainImageFormat;
@@ -434,7 +432,7 @@ private:
   {
     VkAttachmentDescription colorAttachment = {};
     colorAttachment.format = swapChainImageFormat;
-    colorAttachment.samples = msaaSamples;
+    colorAttachment.samples = device_.msaa_sample_count();
     colorAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     colorAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
     colorAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -444,7 +442,7 @@ private:
 
     VkAttachmentDescription depthAttachment = {};
     depthAttachment.format = findDepthFormat();
-    depthAttachment.samples = msaaSamples;
+    depthAttachment.samples = device_.msaa_sample_count();
     depthAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
     depthAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
     depthAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
@@ -616,7 +614,7 @@ private:
     multisampling.sType =
         VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
     multisampling.sampleShadingEnable = VK_FALSE;
-    multisampling.rasterizationSamples = msaaSamples;
+    multisampling.rasterizationSamples = device_.msaa_sample_count();
 
     VkPipelineDepthStencilStateCreateInfo depthStencil = {};
     depthStencil.sType =
@@ -725,12 +723,12 @@ private:
   {
     VkFormat colorFormat = swapChainImageFormat;
 
-    createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples,
-                colorFormat, VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-                    VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage,
-                colorImageMemory);
+    createImage(
+        swapChainExtent.width, swapChainExtent.height, 1,
+        device_.msaa_sample_count(), colorFormat, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, colorImage, colorImageMemory);
     colorImageView =
         createImageView(colorImage, colorFormat, VK_IMAGE_ASPECT_COLOR_BIT, 1);
   }
@@ -739,11 +737,11 @@ private:
   {
     VkFormat depthFormat = findDepthFormat();
 
-    createImage(swapChainExtent.width, swapChainExtent.height, 1, msaaSamples,
-                depthFormat, VK_IMAGE_TILING_OPTIMAL,
-                VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage,
-                depthImageMemory);
+    createImage(
+        swapChainExtent.width, swapChainExtent.height, 1,
+        device_.msaa_sample_count(), depthFormat, VK_IMAGE_TILING_OPTIMAL,
+        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
+        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depthImage, depthImageMemory);
     depthImageView =
         createImageView(depthImage, depthFormat, VK_IMAGE_ASPECT_DEPTH_BIT, 1);
   }
@@ -923,37 +921,6 @@ private:
                          0, nullptr, 1, &barrier);
 
     endSingleTimeCommands(commandBuffer);
-  }
-
-  VkSampleCountFlagBits getMaxUsableSampleCount()
-  {
-    VkPhysicalDeviceProperties physicalDeviceProperties;
-    vkGetPhysicalDeviceProperties(device_.vk_physical_device(),
-                                  &physicalDeviceProperties);
-
-    VkSampleCountFlags counts =
-        physicalDeviceProperties.limits.framebufferColorSampleCounts &
-        physicalDeviceProperties.limits.framebufferDepthSampleCounts;
-    if (counts & VK_SAMPLE_COUNT_64_BIT) {
-      return VK_SAMPLE_COUNT_64_BIT;
-    }
-    if (counts & VK_SAMPLE_COUNT_32_BIT) {
-      return VK_SAMPLE_COUNT_32_BIT;
-    }
-    if (counts & VK_SAMPLE_COUNT_16_BIT) {
-      return VK_SAMPLE_COUNT_16_BIT;
-    }
-    if (counts & VK_SAMPLE_COUNT_8_BIT) {
-      return VK_SAMPLE_COUNT_8_BIT;
-    }
-    if (counts & VK_SAMPLE_COUNT_4_BIT) {
-      return VK_SAMPLE_COUNT_4_BIT;
-    }
-    if (counts & VK_SAMPLE_COUNT_2_BIT) {
-      return VK_SAMPLE_COUNT_2_BIT;
-    }
-
-    return VK_SAMPLE_COUNT_1_BIT;
   }
 
   void createTextureImageView()
@@ -1768,48 +1735,6 @@ private:
     return ids;
   }
 
-  std::vector<const char*> getRequiredExtensions()
-  {
-    uint32_t glfwExtensionCount = 0;
-    const char** glfwExtensions;
-    glfwExtensions = glfwGetRequiredInstanceExtensions(&glfwExtensionCount);
-
-    std::vector<const char*> extensions(glfwExtensions,
-                                        glfwExtensions + glfwExtensionCount);
-
-    if (enableValidationLayers) {
-      extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
-    }
-
-    return extensions;
-  }
-
-  bool checkValidationLayerSupport()
-  {
-    uint32_t layerCount;
-    vkEnumerateInstanceLayerProperties(&layerCount, nullptr);
-
-    std::vector<VkLayerProperties> availableLayers(layerCount);
-    vkEnumerateInstanceLayerProperties(&layerCount, availableLayers.data());
-
-    for (const char* layerName : validationLayers) {
-      bool layerFound = false;
-
-      for (const auto& layerProperties : availableLayers) {
-        if (strcmp(layerName, layerProperties.layerName) == 0) {
-          layerFound = true;
-          break;
-        }
-      }
-
-      if (!layerFound) {
-        return false;
-      }
-    }
-
-    return true;
-  }
-
   static std::vector<char> readFile(const std::string& filename)
   {
     std::ifstream file(filename, std::ios::ate | std::ios::binary);
@@ -1825,17 +1750,6 @@ private:
     file.read(buffer.data(), static_cast<std::streamsize>(fileSize));
 
     return buffer;
-  }
-
-  static VKAPI_ATTR VkBool32 VKAPI_CALL
-  debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT /*messageSeverity*/,
-                VkDebugUtilsMessageTypeFlagsEXT /*messageType*/,
-                const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
-                void* /*pUserData*/)
-  {
-    std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
-
-    return VK_FALSE;
   }
 };
 

@@ -8,7 +8,7 @@ add_library(vulkan_helper
         physical_device_picker.cpp
         logical_device.hpp
         logical_device.cpp
-        utils.hpp panic.cpp panic.hpp unique_resource.hpp)
+        panic.cpp panic.hpp unique_resource.hpp)
 target_link_libraries(vulkan_helper
         PUBLIC
         third_party::vma

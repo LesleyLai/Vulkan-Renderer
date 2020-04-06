@@ -1,8 +1,8 @@
 #include "logical_device.hpp"
+#include "../utils/utils.hpp"
 #include "instance.hpp"
 #include "panic.hpp"
 #include "physical_device_picker.hpp"
-#include "utils.hpp"
 
 namespace vkh {
 

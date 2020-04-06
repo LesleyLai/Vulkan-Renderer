@@ -7,10 +7,36 @@
 
 #include <fmt/format.h>
 
-#include "../vulkan_helper/panic.hpp"
-#include "../vulkan_helper/utils.hpp"
+#include "../utils/utils.hpp"
 
 #include <beyond/core/utils/panic.hpp>
+
+VkSampleCountFlagBits getMaxUsableSampleCount(const vkb::PhysicalDevice& pd)
+{
+  VkSampleCountFlags counts =
+      pd.properties.limits.framebufferColorSampleCounts &
+      pd.properties.limits.framebufferDepthSampleCounts;
+  if (counts & VK_SAMPLE_COUNT_64_BIT) {
+    return VK_SAMPLE_COUNT_64_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_32_BIT) {
+    return VK_SAMPLE_COUNT_32_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_16_BIT) {
+    return VK_SAMPLE_COUNT_16_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_8_BIT) {
+    return VK_SAMPLE_COUNT_8_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_4_BIT) {
+    return VK_SAMPLE_COUNT_4_BIT;
+  }
+  if (counts & VK_SAMPLE_COUNT_2_BIT) {
+    return VK_SAMPLE_COUNT_2_BIT;
+  }
+
+  return VK_SAMPLE_COUNT_1_BIT;
+}
 
 GPUDevice::GPUDevice(Window& window,
                      ValidationLayerSetting validation_layer_setting) noexcept
@@ -35,7 +61,11 @@ GPUDevice::GPUDevice(Window& window,
   surface_ = window.create_vulkan_surface(instance_.instance, nullptr);
 
   vkb::PhysicalDeviceSelector selector{*instance_ret};
-  selector.set_surface(surface_).set_minimum_version(1, 1);
+  VkPhysicalDeviceFeatures features = {};
+  features.samplerAnisotropy = VK_TRUE;
+  selector.set_surface(surface_)
+      .set_minimum_version(1, 1)
+      .set_required_features(features);
   auto phys_ret = selector.select();
   if (!phys_ret) {
     beyond::panic(
@@ -43,6 +73,7 @@ GPUDevice::GPUDevice(Window& window,
   }
 
   physical_device_ = phys_ret->physical_device;
+  msaa_sample_count_ = getMaxUsableSampleCount(*phys_ret);
 
   vkb::DeviceBuilder device_builder{phys_ret.value()};
   auto dev_ret = device_builder.build();

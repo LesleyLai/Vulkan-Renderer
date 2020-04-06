@@ -1,5 +1,5 @@
 #include "queue_indices.hpp"
-#include "../vulkan_helper/utils.hpp"
+#include "../utils/utils.hpp"
 
 namespace vkh {
 
