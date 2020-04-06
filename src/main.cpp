@@ -14,6 +14,8 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
+#include "wrappers/window.hpp"
+
 #include <algorithm>
 #include <array>
 #include <chrono>
@@ -28,13 +30,13 @@
 #include <unordered_map>
 #include <vector>
 
-const int WIDTH = 800;
-const int HEIGHT = 600;
+constexpr int init_width = 800;
+constexpr int init_height = 600;
 
-const std::string MODEL_PATH = "models/chalet.obj";
-const std::string TEXTURE_PATH = "textures/chalet.jpg";
+constexpr const char* model_path = "models/chalet.obj";
+constexpr const char* texture_path = "textures/chalet.jpg";
 
-const int MAX_FRAMES_IN_FLIGHT = 2;
+constexpr int max_frames_in_flight = 2;
 
 const std::vector<const char*> validationLayers = {
     "VK_LAYER_KHRONOS_validation"};
@@ -150,16 +152,20 @@ struct UniformBufferObject {
 
 class HelloTriangleApplication {
 public:
-  void run()
+  HelloTriangleApplication() : window_{init_width, init_height, "Vulkan"}
   {
     initWindow();
     initVulkan();
+  }
+
+  void run()
+  {
     mainLoop();
     cleanup();
   }
 
 private:
-  GLFWwindow* window;
+  Window window_;
 
   VkInstance instance;
   VkDebugUtilsMessengerEXT debugMessenger;
@@ -225,13 +231,9 @@ private:
 
   void initWindow()
   {
-    glfwInit();
-
-    glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-
-    window = glfwCreateWindow(WIDTH, HEIGHT, "Vulkan", nullptr, nullptr);
-    glfwSetWindowUserPointer(window, this);
-    glfwSetFramebufferSizeCallback(window, framebufferResizeCallback);
+    window_ = Window(init_width, init_height, "Vulkan");
+    glfwSetWindowUserPointer(window_.get(), this);
+    glfwSetFramebufferSizeCallback(window_.get(), framebufferResizeCallback);
   }
 
   static void framebufferResizeCallback(GLFWwindow* window, int /*width*/,
@@ -273,7 +275,7 @@ private:
 
   void mainLoop()
   {
-    while (!glfwWindowShouldClose(window)) {
+    while (!window_.should_close()) {
       glfwPollEvents();
       drawFrame();
     }
@@ -335,7 +337,7 @@ private:
     vkDestroyBuffer(device_, vertexBuffer, nullptr);
     vkFreeMemory(device_, vertexBufferMemory, nullptr);
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    for (size_t i = 0; i < max_frames_in_flight; i++) {
       vkDestroySemaphore(device_, renderFinishedSemaphores[i], nullptr);
       vkDestroySemaphore(device_, imageAvailableSemaphores[i], nullptr);
       vkDestroyFence(device_, inFlightFences[i], nullptr);
@@ -351,18 +353,14 @@ private:
 
     vkDestroySurfaceKHR(instance, surface, nullptr);
     vkDestroyInstance(instance, nullptr);
-
-    glfwDestroyWindow(window);
-
-    glfwTerminate();
   }
 
   void recreateSwapChain()
   {
     int width = 0, height = 0;
-    glfwGetFramebufferSize(window, &width, &height);
+    glfwGetFramebufferSize(window_.get(), &width, &height);
     while (width == 0 || height == 0) {
-      glfwGetFramebufferSize(window, &width, &height);
+      glfwGetFramebufferSize(window_.get(), &width, &height);
       glfwWaitEvents();
     }
 
@@ -456,10 +454,7 @@ private:
 
   void createSurface()
   {
-    if (glfwCreateWindowSurface(instance, window, nullptr, &surface) !=
-        VK_SUCCESS) {
-      throw std::runtime_error("failed to create window surface!");
-    }
+    window_.create_vulkan_surface(instance, nullptr, surface);
   }
 
   void pickPhysicalDevice()
@@ -962,7 +957,7 @@ private:
   void createTextureImage()
   {
     int texWidth, texHeight, texChannels;
-    stbi_uc* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight,
+    stbi_uc* pixels = stbi_load(texture_path, &texWidth, &texHeight,
                                 &texChannels, STBI_rgb_alpha);
     VkDeviceSize imageSize =
         static_cast<VkDeviceSize>(texWidth * texHeight * 4);
@@ -1302,8 +1297,7 @@ private:
     std::vector<tinyobj::material_t> materials;
     std::string err;
 
-    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err,
-                          MODEL_PATH.c_str())) {
+    if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, model_path)) {
       throw std::runtime_error(err);
     }
 
@@ -1640,9 +1634,9 @@ private:
 
   void createSyncObjects()
   {
-    imageAvailableSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    renderFinishedSemaphores.resize(MAX_FRAMES_IN_FLIGHT);
-    inFlightFences.resize(MAX_FRAMES_IN_FLIGHT);
+    imageAvailableSemaphores.resize(max_frames_in_flight);
+    renderFinishedSemaphores.resize(max_frames_in_flight);
+    inFlightFences.resize(max_frames_in_flight);
     imagesInFlight.resize(swapChainImages.size(), VK_NULL_HANDLE);
 
     VkSemaphoreCreateInfo semaphoreInfo = {};
@@ -1652,7 +1646,7 @@ private:
     fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
 
-    for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; i++) {
+    for (size_t i = 0; i < max_frames_in_flight; i++) {
       if (vkCreateSemaphore(device_, &semaphoreInfo, nullptr,
                             &imageAvailableSemaphores[i]) != VK_SUCCESS ||
           vkCreateSemaphore(device_, &semaphoreInfo, nullptr,
@@ -1675,7 +1669,7 @@ private:
                      .count();
 
     UniformBufferObject ubo = {};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(90.0f),
+    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(10.0f),
                             glm::vec3(0.0f, 0.0f, 1.0f));
     ubo.view =
         glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
@@ -1764,7 +1758,7 @@ private:
       throw std::runtime_error("failed to present swap chain image!");
     }
 
-    currentFrame = (currentFrame + 1) % MAX_FRAMES_IN_FLIGHT;
+    currentFrame = (currentFrame + 1) % max_frames_in_flight;
   }
 
   VkShaderModule createShaderModule(const std::vector<char>& code)
@@ -1814,7 +1808,7 @@ private:
       return capabilities.currentExtent;
     } else {
       int width, height;
-      glfwGetFramebufferSize(window, &width, &height);
+      glfwGetFramebufferSize(window_.get(), &width, &height);
 
       VkExtent2D actualExtent = {static_cast<uint32_t>(width),
                                  static_cast<uint32_t>(height)};
@@ -2006,7 +2000,7 @@ private:
   }
 };
 
-int main()
+auto main() -> int
 {
   HelloTriangleApplication app;
 

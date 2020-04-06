@@ -1,7 +1,7 @@
 #include "physical_device_picker.hpp"
 #include "../swapchain.hpp"
+#include "../wrappers/queue_indices.hpp"
 #include "panic.hpp"
-#include "queue_indices.hpp"
 #include "utils.hpp"
 
 #include <array>

@@ -3,13 +3,10 @@
 #ifndef VULKAN_HELPER_QUEUE_INDICES_HPP
 #define VULKAN_HELPER_QUEUE_INDICES_HPP
 
-#include <volk.h>
-
 #include <optional>
 #include <set>
 #include <vector>
-
-namespace vkh {
+#include <vulkan/vulkan.h>
 
 struct QueueFamilyIndices {
   std::uint32_t graphics_family;
@@ -24,7 +21,5 @@ struct QueueFamilyIndices {
 
 auto find_queue_families(VkPhysicalDevice device, VkSurfaceKHR surface) noexcept
     -> std::optional<QueueFamilyIndices>;
-
-} // namespace vkh
 
 #endif // VULKAN_HELPER_QUEUE_INDICES_HPP

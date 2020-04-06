@@ -3,8 +3,6 @@
 #ifndef VULKAN_HELPER_INSTANCE_HPP
 #define VULKAN_HELPER_INSTANCE_HPP
 
-#include <volk.h>
-
 #include <array>
 #include <vector>
 

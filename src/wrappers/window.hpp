@@ -7,8 +7,6 @@
 #include <string_view>
 #include <vector>
 
-struct VkInstance_T;
-struct VkSurfaceKHR_T;
 struct VkAllocationCallbacks;
 
 using VkInstance = struct VkInstance_T*;
@@ -36,7 +34,7 @@ public:
 
   [[nodiscard]] auto should_close() const noexcept -> bool;
 
-  auto poll_events() noexcept -> void;
+  static auto poll_events() noexcept -> void;
 
   auto swap_buffers() noexcept -> void;
 
@@ -46,8 +44,10 @@ public:
     return title_;
   }
 
+  [[nodiscard]] auto get() const noexcept -> struct GLFWwindow*;
+
   /// @brief Get the extensions needed for the vulkan instance
-  [[nodiscard]] auto get_required_instance_extensions() const noexcept
+  [[nodiscard]] static auto get_required_instance_extensions() noexcept
       -> std::vector<const char*>;
 
   /**

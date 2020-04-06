@@ -1,21 +1,28 @@
-add_subdirectory(vulkan_helper)
+# add_subdirectory(vulkan_helper)
 
 find_package(Vulkan)
 
 add_executable(app
         main.cpp
-        window.hpp
-        window.cpp
         swapchain.hpp
         swapchain.cpp
-        gpu_device.hpp
-        gpu_device.cpp
+
+        wrappers/window.hpp
+        wrappers/window.cpp
+        wrappers/gpu_device.hpp
+        wrappers/gpu_device.cpp
         )
 target_link_libraries(app
         PRIVATE compiler_options
         #vulkan_helper
         Vulkan::Vulkan
         beyond::core
+
+        third_party::vma
+        #third_party::volk
+
+        vk-bootstrap::vk-bootstrap
+
         CONAN_PKG::glfw
         CONAN_PKG::glm
         CONAN_PKG::stb

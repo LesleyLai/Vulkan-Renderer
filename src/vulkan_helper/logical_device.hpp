@@ -3,7 +3,7 @@
 
 #include <volk.h>
 
-#include "queue_indices.hpp"
+#include "../wrappers/queue_indices.hpp"
 
 namespace vkh {
 

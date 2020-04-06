@@ -41,7 +41,7 @@ Window::Window(int width, int height, std::string title) noexcept
   }
 
   glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
-  glfwWindowHint(GLFW_RESIZABLE, GLFW_FALSE);
+  glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
   auto glfw_window =
       glfwCreateWindow(width, height, title_.data(), nullptr, nullptr);
 
@@ -68,8 +68,13 @@ auto Window::swap_buffers() noexcept -> void
   return static_cast<bool>(glfwWindowShouldClose(pimpl_->data_));
 }
 
+[[nodiscard]] auto Window::get() const noexcept -> GLFWwindow*
+{
+  return pimpl_->data_;
+}
+
 /// @brief Get the extensions needed for the vulkan instance
-[[nodiscard]] auto Window::get_required_instance_extensions() const noexcept
+[[nodiscard]] auto Window::get_required_instance_extensions() noexcept
     -> std::vector<const char*>
 {
   uint32_t glfw_extension_count = 0;

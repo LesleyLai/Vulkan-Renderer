@@ -1,12 +1,14 @@
 # beyond::core
 add_subdirectory(beyond-core)
 
-# volk
-if (WIN32)
-    set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WIN32_KHR)
-endif ()
-add_subdirectory(volk)
-add_library(third_party::volk ALIAS volk)
+## volk
+#if (WIN32)
+#    set(VOLK_STATIC_DEFINES VK_USE_PLATFORM_WIN32_KHR)
+#endif ()
+#add_subdirectory(volk)
+#add_library(third_party::volk ALIAS volk)
+
+add_subdirectory(vk-bootstrap)
 
 # vulkan memory allocator
 add_library(vma INTERFACE)

@@ -2,8 +2,6 @@ add_library(vulkan_helper
         check.hpp
         instance.hpp
         instance.cpp
-        queue_indices.hpp
-        queue_indices.cpp
         shader_module.hpp
         shader_module.cpp
         physical_device_picker.hpp
