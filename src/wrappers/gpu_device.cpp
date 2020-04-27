@@ -9,7 +9,7 @@
 
 #include "../utils/utils.hpp"
 
-#include <beyond/core/utils/panic.hpp>
+#include <beyond/utils/panic.hpp>
 
 VkSampleCountFlagBits getMaxUsableSampleCount(const vkb::PhysicalDevice& pd)
 {

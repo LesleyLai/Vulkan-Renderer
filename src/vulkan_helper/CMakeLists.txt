@@ -2,13 +2,13 @@ add_library(vulkan_helper
         check.hpp
         instance.hpp
         instance.cpp
-        shader_module.hpp
-        shader_module.cpp
+        ../wrappers/shader_module.hpp
+        ../wrappers/shader_module.cpp
         physical_device_picker.hpp
         physical_device_picker.cpp
         logical_device.hpp
         logical_device.cpp
-        panic.cpp panic.hpp unique_resource.hpp)
+        panic.cpp panic.hpp ../wrappers/unique_resource.hpp)
 target_link_libraries(vulkan_helper
         PUBLIC
         third_party::vma

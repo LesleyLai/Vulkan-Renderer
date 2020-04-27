@@ -6,7 +6,7 @@
 #include <windows.h>
 #endif
 
-#include <beyond/core/utils/panic.hpp>
+#include <beyond/utils/panic.hpp>
 
 #include "window.hpp"
 

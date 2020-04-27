@@ -1,7 +1,7 @@
 #ifndef VULKAN_HELPER_UNIQUE_RESOURCE_HPP
 #define VULKAN_HELPER_UNIQUE_RESOURCE_HPP
 
-#include <volk.h>
+#include <vulkan/vulkan_core.h>
 
 #include <utility>
 

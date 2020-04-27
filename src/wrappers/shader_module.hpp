@@ -3,7 +3,7 @@
 #ifndef VULKAN_HELPER_SHADER_MODULE_HPP
 #define VULKAN_HELPER_SHADER_MODULE_HPP
 
-#include <volk.h>
+#include <vulkan/vulkan_core.h>
 
 #include <string_view>
 #include <vector>

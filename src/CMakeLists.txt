@@ -11,6 +11,9 @@ add_executable(app
         wrappers/window.cpp
         wrappers/gpu_device.hpp
         wrappers/gpu_device.cpp
+        wrappers/shader_module.hpp
+        wrappers/shader_module.cpp
+        wrappers/unique_resource.hpp
 
         utils/vma_source.cpp
         utils/utils.hpp

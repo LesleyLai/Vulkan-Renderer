@@ -1,5 +1,6 @@
 #include "shader_module.hpp"
-#include "panic.hpp"
+
+#include <beyond/utils/panic.hpp>
 
 #include <cstddef>
 #include <fstream>
@@ -14,7 +15,7 @@ namespace {
 
   if (!file.is_open()) {
     // TODO(lesley): error handling
-    vkh::panic("Failed to open file " + std::string(filename));
+    beyond::panic("Failed to open file " + std::string(filename));
   }
 
   size_t file_size = static_cast<size_t>(file.tellg());
@@ -49,7 +50,7 @@ namespace vkh {
   // TODO(lesley): error handling
   if (vkCreateShaderModule(device, &create_info, nullptr, &module) !=
       VK_SUCCESS) {
-    vkh::panic("Cannot load shader\n");
+    beyond::panic("Cannot load shader\n");
   }
 
   return module;
