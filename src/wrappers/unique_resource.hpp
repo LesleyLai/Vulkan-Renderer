@@ -1,11 +1,9 @@
-#ifndef VULKAN_HELPER_UNIQUE_RESOURCE_HPP
-#define VULKAN_HELPER_UNIQUE_RESOURCE_HPP
+#ifndef VULKAN_RENDERER_UNIQUE_RESOURCE_HPP
+#define VULKAN_RENDERER_UNIQUE_RESOURCE_HPP
 
 #include <vulkan/vulkan_core.h>
 
 #include <utility>
-
-namespace vkh {
 
 template <typename T> class UniqueResource {
 public:
@@ -91,12 +89,10 @@ private:
     }
   }
 
-  VkDevice device_;
+  VkDevice device_ = nullptr;
   Deleter* deleter_;
   const VkAllocationCallbacks* allocator_ptr_ = nullptr;
   T resource_;
 };
 
-} // namespace vkh
-
-#endif // VULKAN_HELPER_UNIQUE_RESOURCE_HPP
+#endif // VULKAN_RENDERER_UNIQUE_RESOURCE_HPP

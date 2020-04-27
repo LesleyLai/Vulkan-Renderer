@@ -48,7 +48,7 @@ public:
     return physical_device_;
   }
 
-  [[nodiscard]] auto vk_device() const noexcept -> VkDevice
+  [[nodiscard]] auto device() const noexcept -> VkDevice
   {
     return device_;
   }

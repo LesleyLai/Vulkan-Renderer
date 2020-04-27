@@ -126,5 +126,5 @@ GPUDevice::~GPUDevice() noexcept
 
 auto GPUDevice::wait_idle() const noexcept -> void
 {
-  vkDeviceWaitIdle(this->vk_device());
+  vkDeviceWaitIdle(this->device());
 }

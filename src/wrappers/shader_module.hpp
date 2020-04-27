@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef VULKAN_HELPER_SHADER_MODULE_HPP
-#define VULKAN_HELPER_SHADER_MODULE_HPP
+#ifndef VULKAN_RENDERER_SHADER_MODULE_HPP
+#define VULKAN_RENDERER_SHADER_MODULE_HPP
 
 #include <vulkan/vulkan_core.h>
 
@@ -9,8 +9,6 @@
 #include <vector>
 
 #include "unique_resource.hpp"
-
-namespace vkh {
 
 struct UniqueShaderModule : UniqueResource<VkShaderModule> {
   UniqueShaderModule(
@@ -22,13 +20,12 @@ struct UniqueShaderModule : UniqueResource<VkShaderModule> {
   }
 };
 
-[[nodiscard]] auto create_shader_module(std::string_view filename,
-                                        VkDevice device) -> VkShaderModule;
+[[nodiscard]] auto create_shader_module(VkDevice device,
+                                        std::string_view filename)
+    -> VkShaderModule;
 
-[[nodiscard]] auto create_unique_shader_module(std::string_view filename,
-                                               VkDevice device)
+[[nodiscard]] auto create_unique_shader_module(VkDevice device,
+                                               std::string_view filename)
     -> UniqueShaderModule;
 
-} // namespace vkh
-
-#endif // VULKAN_HELPER_SHADER_MODULE_HPP
+#endif // VULKAN_RENDERER_SHADER_MODULE_HPP
