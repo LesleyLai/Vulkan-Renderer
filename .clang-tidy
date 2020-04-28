@@ -9,15 +9,20 @@ Checks:          '*,
 -readability-named-parameter,
 -readability-isolate-declaration,
 -readability-magic-numbers,
+-readability-implicit-bool-conversion,
 -*-uppercase-literal-suffix,
 -llvm-include-order,
 -llvm-header-guard,
+-cppcoreguidelines-pro-bounds-constant-array-index,
 -cppcoreguidelines-avoid-magic-numbers,
 -cppcoreguidelines-avoid-c-arrays,
 -cppcoreguidelines-pro-type-union-access,
 -fuchsia-*,
 -google-runtime-references,
--google-build-using-namespace
+-google-build-using-namespace,
+-google-readability-braces-around-statements,
+-hicpp-avoid-c-arrays,
+-hicpp-signed-bitwise,
 '
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'catch.hpp'
