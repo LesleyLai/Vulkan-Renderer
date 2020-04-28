@@ -18,6 +18,7 @@
 #include "wrappers/shader_module.hpp"
 #include "wrappers/window.hpp"
 
+#include <beyond/math/angle.hpp>
 #include <beyond/utils/bit_cast.hpp>
 
 #include <algorithm>
@@ -116,9 +117,9 @@ template <> struct hash<Vertex> {
 } // namespace std
 
 struct UniformBufferObject {
-  alignas(16) glm::mat4 model;
-  alignas(16) glm::mat4 view;
-  alignas(16) glm::mat4 proj;
+  glm::mat4 model;
+  glm::mat4 view;
+  glm::mat4 proj;
 };
 
 class HelloTriangleApplication {
@@ -127,7 +128,8 @@ public:
       : window_{init_width, init_height, "Vulkan"}, device_{window_}
   {
     glfwSetWindowUserPointer(window_.get(), this);
-    glfwSetFramebufferSizeCallback(window_.get(), framebufferResizeCallback);
+    glfwSetFramebufferSizeCallback(window_.get(), framebuffer_resize_callback);
+    glfwSetKeyCallback(window_.get(), key_callback);
 
     initVulkan();
   }
@@ -191,14 +193,51 @@ private:
   std::vector<VkFence> images_in_flight_;
   size_t current_frame_ = 0;
 
+  beyond::Radian rotation_x_{0.0f};
+  beyond::Radian rotation_z_{0.0f};
+
   bool framebuffer_resized_ = false;
 
-  static void framebufferResizeCallback(GLFWwindow* window, int /*width*/,
-                                        int /*height*/)
+  static void framebuffer_resize_callback(GLFWwindow* window, int /*width*/,
+                                          int /*height*/)
   {
     auto* app = beyond::bit_cast<HelloTriangleApplication*>(
         glfwGetWindowUserPointer(window));
     app->framebuffer_resized_ = true;
+  }
+
+  static void key_callback(GLFWwindow* window, int key, int /*scancode*/,
+                           int action, int /*mods*/)
+  {
+    using namespace beyond::literals;
+
+    auto* app = beyond::bit_cast<HelloTriangleApplication*>(
+        glfwGetWindowUserPointer(window));
+
+    switch (action) {
+    case GLFW_PRESS:
+      [[fallthrough]];
+    case GLFW_REPEAT:
+      switch (key) {
+      case GLFW_KEY_W:
+        app->rotation_x_ -= 0.1_rad;
+        break;
+      case GLFW_KEY_S:
+        app->rotation_x_ += 0.1_rad;
+        break;
+      case GLFW_KEY_A:
+        app->rotation_z_ -= 0.1_rad;
+        break;
+      case GLFW_KEY_D:
+        app->rotation_z_ += 0.1_rad;
+        break;
+      default:
+        break;
+      }
+      break;
+    default:
+      break;
+    }
   }
 
   void initVulkan()
@@ -560,9 +599,9 @@ private:
 
     const VkViewport viewport = {
         .x = 0.0f,
-        .y = 0.0f,
+        .y = static_cast<float>(swapchain_extent_.height),
         .width = static_cast<float>(swapchain_extent_.width),
-        .height = static_cast<float>(swapchain_extent_.height),
+        .height = -static_cast<float>(swapchain_extent_.height),
         .minDepth = 0.0f,
         .maxDepth = 1.0f,
     };
@@ -808,7 +847,7 @@ private:
   }
 
   void generate_mipmaps(VkImage image, VkFormat imageFormat, int32_t texWidth,
-                        int32_t texHeight, uint32_t mipLevels)
+                        int32_t texHeight, uint32_t mip_levels)
   {
     // Check if image format supports linear blitting
     VkFormatProperties formatProperties;
@@ -836,7 +875,7 @@ private:
     int32_t mipWidth = texWidth;
     int32_t mipHeight = texHeight;
 
-    for (uint32_t i = 1; i < mipLevels; i++) {
+    for (uint32_t i = 1; i < mip_levels; ++i) {
       barrier.subresourceRange.baseMipLevel = i - 1;
       barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
       barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
@@ -881,7 +920,7 @@ private:
         mipHeight /= 2;
     }
 
-    barrier.subresourceRange.baseMipLevel = mipLevels - 1;
+    barrier.subresourceRange.baseMipLevel = mip_levels - 1;
     barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
     barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
     barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
@@ -1441,16 +1480,11 @@ private:
 
   void update_uniform_buffer(uint32_t currentImage)
   {
-    static auto startTime = std::chrono::high_resolution_clock::now();
-
-    auto currentTime = std::chrono::high_resolution_clock::now();
-    float time = std::chrono::duration<float, std::chrono::seconds::period>(
-                     currentTime - startTime)
-                     .count();
-
     UniformBufferObject ubo = {};
-    ubo.model = glm::rotate(glm::mat4(1.0f), time * glm::radians(10.0f),
-                            glm::vec3(0.0f, 0.0f, 1.0f));
+    ubo.model = glm::rotate(glm::mat4(1.0f), rotation_z_.value(),
+                            glm::vec3(0.0f, 0.0f, 1.0f)) *
+                glm::rotate(glm::mat4(1.0f), rotation_x_.value(),
+                            glm::vec3(1.0f, 0.0f, 0.0f));
     ubo.view =
         glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
                     glm::vec3(0.0f, 0.0f, 1.0f));
@@ -1459,7 +1493,6 @@ private:
                          static_cast<float>(swapchain_extent_.width) /
                              static_cast<float>(swapchain_extent_.height),
                          0.1f, 10.0f);
-    ubo.proj[1][1] *= -1;
 
     void* data;
     vkMapMemory(device_.device(), uniform_buffers_memory_[currentImage], 0,
