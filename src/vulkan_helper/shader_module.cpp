@@ -1,7 +1,6 @@
 #include "shader_module.hpp"
 
 #include <beyond/utils/bit_cast.hpp>
-#include <beyond/utils/panic.hpp>
 
 #include <cstddef>
 #include <fstream>
@@ -31,9 +30,11 @@ namespace {
 
 } // anonymous namespace
 
+namespace vkh {
+
 [[nodiscard]] auto create_shader_module(VkDevice device,
                                         const std::string_view filename)
-    -> VkShaderModule
+    -> beyond::expected<VkShaderModule, VkResult>
 {
   const auto buffer = read_file(filename);
 
@@ -46,19 +47,24 @@ namespace {
   };
 
   VkShaderModule module = nullptr;
-  // TODO(lesley): error handling
-  if (vkCreateShaderModule(device, &create_info, nullptr, &module) !=
-      VK_SUCCESS) {
-    beyond::panic("Cannot load shader\n");
+  if (VkResult result =
+          vkCreateShaderModule(device, &create_info, nullptr, &module);
+      result != VK_SUCCESS) {
+    return beyond::unexpected(result);
+  } else {
+    return module;
   }
-
-  return module;
 }
 
 [[nodiscard]] auto create_unique_shader_module(VkDevice device,
                                                std::string_view filename)
-    -> UniqueShaderModule
+    -> beyond::expected<UniqueShaderModule, VkResult>
 {
-  return UniqueShaderModule{device, create_shader_module(device, filename),
-                            nullptr};
+  return create_shader_module(device, filename)
+      .and_then([device](VkShaderModule shader_module) {
+        return beyond::expected<UniqueShaderModule, VkResult>(
+            UniqueShaderModule{device, shader_module, nullptr});
+      });
 }
+
+} // namespace vkh

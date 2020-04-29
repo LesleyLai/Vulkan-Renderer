@@ -23,6 +23,7 @@ Checks:          '*,
 -google-readability-braces-around-statements,
 -hicpp-avoid-c-arrays,
 -hicpp-signed-bitwise,
+-hicpp-braces-around-statements,
 '
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'catch.hpp'

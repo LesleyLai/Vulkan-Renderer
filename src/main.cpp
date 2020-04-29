@@ -558,10 +558,14 @@ private:
 
   void create_graphics_pipeline()
   {
-    const UniqueShaderModule vert_shader_module = create_unique_shader_module(
-        device_.device(), "shaders/shader.vert.spv");
-    const UniqueShaderModule frag_shader_module = create_unique_shader_module(
-        device_.device(), "shaders/shader.frag.spv");
+    const vkh::UniqueShaderModule vert_shader_module =
+        vkh::create_unique_shader_module(device_.device(),
+                                         "shaders/shader.vert.spv")
+            .value();
+    const vkh::UniqueShaderModule frag_shader_module =
+        vkh::create_unique_shader_module(device_.device(),
+                                         "shaders/shader.frag.spv")
+            .value();
 
     const VkPipelineShaderStageCreateInfo vert_shader_stage_info = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
@@ -723,12 +727,12 @@ private:
 
   void create_command_pool()
   {
-    QueueFamilyIndices queueFamilyIndices =
+    QueueFamilyIndices queue_family_indices =
         find_queue_families(device_.vk_physical_device());
 
     VkCommandPoolCreateInfo poolInfo = {};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    poolInfo.queueFamilyIndex = queueFamilyIndices.graphicsFamily.value();
+    poolInfo.queueFamilyIndex = queue_family_indices.graphicsFamily.value();
 
     if (vkCreateCommandPool(device_.device(), &poolInfo, nullptr,
                             &command_pool_) != VK_SUCCESS) {
@@ -803,9 +807,7 @@ private:
                       std::floor(std::log2(std::max(tex_width, tex_height)))) +
                   1;
 
-    if (!pixels) {
-      throw std::runtime_error("failed to load texture image!");
-    }
+    if (!pixels) { throw std::runtime_error("failed to load texture image!"); }
 
     auto [staging_buffer, staging_buffer_allocation] =
         create_buffer(image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
@@ -860,15 +862,17 @@ private:
 
     VkCommandBuffer commandBuffer = begin_single_time_commands();
 
-    VkImageMemoryBarrier barrier = {};
-    barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
-    barrier.image = image;
-    barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-    barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    barrier.subresourceRange.baseArrayLayer = 0;
-    barrier.subresourceRange.layerCount = 1;
-    barrier.subresourceRange.levelCount = 1;
+    VkImageMemoryBarrier barrier = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+        .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+        .image = image,
+        .subresourceRange = {
+            .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+            .levelCount = 1,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        }};
 
     int32_t mipWidth = texWidth;
     int32_t mipHeight = texHeight;
@@ -884,20 +888,23 @@ private:
                            VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
                            nullptr, 1, &barrier);
 
-      VkImageBlit blit = {};
-      blit.srcOffsets[0] = {0, 0, 0};
-      blit.srcOffsets[1] = {mipWidth, mipHeight, 1};
-      blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-      blit.srcSubresource.mipLevel = i - 1;
-      blit.srcSubresource.baseArrayLayer = 0;
-      blit.srcSubresource.layerCount = 1;
-      blit.dstOffsets[0] = {0, 0, 0};
-      blit.dstOffsets[1] = {mipWidth > 1 ? mipWidth / 2 : 1,
-                            mipHeight > 1 ? mipHeight / 2 : 1, 1};
-      blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-      blit.dstSubresource.mipLevel = i;
-      blit.dstSubresource.baseArrayLayer = 0;
-      blit.dstSubresource.layerCount = 1;
+      const VkImageBlit blit = {
+          .srcSubresource{
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .mipLevel = i - 1,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+          .srcOffsets = {{0, 0, 0}, {mipWidth, mipHeight, 1}},
+          .dstSubresource{
+              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+              .mipLevel = i,
+              .baseArrayLayer = 0,
+              .layerCount = 1,
+          },
+          .dstOffsets = {{0, 0, 0},
+                         {mipWidth > 1 ? mipWidth / 2 : 1,
+                          mipHeight > 1 ? mipHeight / 2 : 1, 1}}};
 
       vkCmdBlitImage(commandBuffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
                      image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit,
@@ -912,10 +919,8 @@ private:
                            VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
                            0, nullptr, 1, &barrier);
 
-      if (mipWidth > 1)
-        mipWidth /= 2;
-      if (mipHeight > 1)
-        mipHeight /= 2;
+      if (mipWidth > 1) mipWidth /= 2;
+      if (mipHeight > 1) mipHeight /= 2;
     }
 
     barrier.subresourceRange.baseMipLevel = mip_levels - 1;
@@ -1080,23 +1085,27 @@ private:
   void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t width,
                             uint32_t height)
   {
-    VkCommandBuffer commandBuffer = begin_single_time_commands();
+    const VkCommandBuffer command_buffer = begin_single_time_commands();
 
-    VkBufferImageCopy region = {};
-    region.bufferOffset = 0;
-    region.bufferRowLength = 0;
-    region.bufferImageHeight = 0;
-    region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-    region.imageSubresource.mipLevel = 0;
-    region.imageSubresource.baseArrayLayer = 0;
-    region.imageSubresource.layerCount = 1;
-    region.imageOffset = {0, 0, 0};
-    region.imageExtent = {width, height, 1};
+    const VkBufferImageCopy region = {
+        .bufferOffset = 0,
+        .bufferRowLength = 0,
+        .bufferImageHeight = 0,
+        .imageSubresource =
+            {
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .mipLevel = 0,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            },
+        .imageOffset = {0, 0, 0},
+        .imageExtent = {width, height, 1},
+    };
 
-    vkCmdCopyBufferToImage(commandBuffer, buffer, image,
+    vkCmdCopyBufferToImage(command_buffer, buffer, image,
                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-    end_single_time_commands(commandBuffer);
+    end_single_time_commands(command_buffer);
   }
 
   void load_model()
@@ -1210,21 +1219,24 @@ private:
 
   void create_descriptor_pool()
   {
-    std::array<VkDescriptorPoolSize, 2> poolSizes = {};
-    poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    poolSizes[0].descriptorCount =
-        static_cast<uint32_t>(swapchain_images_.size());
-    poolSizes[1].type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-    poolSizes[1].descriptorCount =
-        static_cast<uint32_t>(swapchain_images_.size());
+    const std::array poolSizes = {
+        VkDescriptorPoolSize{
+            .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+            .descriptorCount = static_cast<uint32_t>(swapchain_images_.size()),
+        },
+        VkDescriptorPoolSize{
+            .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+            .descriptorCount = static_cast<uint32_t>(swapchain_images_.size()),
+        }};
 
-    VkDescriptorPoolCreateInfo poolInfo = {};
-    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
-    poolInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
-    poolInfo.pPoolSizes = poolSizes.data();
-    poolInfo.maxSets = static_cast<uint32_t>(swapchain_images_.size());
+    const VkDescriptorPoolCreateInfo create_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
+        .maxSets = static_cast<uint32_t>(swapchain_images_.size()),
+        .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
+        .pPoolSizes = poolSizes.data(),
+    };
 
-    if (vkCreateDescriptorPool(device_.device(), &poolInfo, nullptr,
+    if (vkCreateDescriptorPool(device_.device(), &create_info, nullptr,
                                &descriptor_pool_) != VK_SUCCESS) {
       throw std::runtime_error("failed to create descriptor pool!");
     }
@@ -1234,52 +1246,55 @@ private:
   {
     std::vector<VkDescriptorSetLayout> layouts(swapchain_images_.size(),
                                                descriptor_set_layout_);
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = descriptor_pool_;
-    allocInfo.descriptorSetCount =
-        static_cast<uint32_t>(swapchain_images_.size());
-    allocInfo.pSetLayouts = layouts.data();
+    const VkDescriptorSetAllocateInfo alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
+        .descriptorPool = descriptor_pool_,
+        .descriptorSetCount = static_cast<uint32_t>(swapchain_images_.size()),
+        .pSetLayouts = layouts.data(),
+    };
 
     descriptor_sets_.resize(swapchain_images_.size());
-    if (vkAllocateDescriptorSets(device_.device(), &allocInfo,
+    if (vkAllocateDescriptorSets(device_.device(), &alloc_info,
                                  descriptor_sets_.data()) != VK_SUCCESS) {
       throw std::runtime_error("failed to allocate descriptor sets!");
     }
 
     for (size_t i = 0; i < swapchain_images_.size(); i++) {
-      VkDescriptorBufferInfo bufferInfo = {};
-      bufferInfo.buffer = uniform_buffers_[i];
-      bufferInfo.offset = 0;
-      bufferInfo.range = sizeof(UniformBufferObject);
+      const VkDescriptorBufferInfo buffer_info = {
+          .buffer = uniform_buffers_[i],
+          .offset = 0,
+          .range = sizeof(UniformBufferObject),
+      };
 
-      VkDescriptorImageInfo imageInfo = {};
-      imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      imageInfo.imageView = texture_image_view_;
-      imageInfo.sampler = texture_sampler_;
+      const VkDescriptorImageInfo image_info = {
+          .sampler = texture_sampler_,
+          .imageView = texture_image_view_,
+          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      };
 
-      std::array<VkWriteDescriptorSet, 2> descriptorWrites = {};
-
-      descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptorWrites[0].dstSet = descriptor_sets_[i];
-      descriptorWrites[0].dstBinding = 0;
-      descriptorWrites[0].dstArrayElement = 0;
-      descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-      descriptorWrites[0].descriptorCount = 1;
-      descriptorWrites[0].pBufferInfo = &bufferInfo;
-
-      descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-      descriptorWrites[1].dstSet = descriptor_sets_[i];
-      descriptorWrites[1].dstBinding = 1;
-      descriptorWrites[1].dstArrayElement = 0;
-      descriptorWrites[1].descriptorType =
-          VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-      descriptorWrites[1].descriptorCount = 1;
-      descriptorWrites[1].pImageInfo = &imageInfo;
+      const std::array descriptor_writes = {
+          VkWriteDescriptorSet{
+              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+              .dstSet = descriptor_sets_[i],
+              .dstBinding = 0,
+              .dstArrayElement = 0,
+              .descriptorCount = 1,
+              .descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+              .pBufferInfo = &buffer_info,
+          },
+          VkWriteDescriptorSet{
+              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+              .dstSet = descriptor_sets_[i],
+              .dstBinding = 1,
+              .dstArrayElement = 0,
+              .descriptorCount = 1,
+              .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              .pImageInfo = &image_info,
+          }};
 
       vkUpdateDescriptorSets(device_.device(),
-                             static_cast<uint32_t>(descriptorWrites.size()),
-                             descriptorWrites.data(), 0, nullptr);
+                             static_cast<uint32_t>(descriptor_writes.size()),
+                             descriptor_writes.data(), 0, nullptr);
     }
   }
 
@@ -1321,37 +1336,39 @@ private:
 
   auto begin_single_time_commands() -> VkCommandBuffer
   {
-    VkCommandBufferAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    allocInfo.commandPool = command_pool_;
-    allocInfo.commandBufferCount = 1;
+    const VkCommandBufferAllocateInfo alloc_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+        .commandPool = command_pool_,
+        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+        .commandBufferCount = 1,
+    };
 
-    VkCommandBuffer commandBuffer;
-    vkAllocateCommandBuffers(device_.device(), &allocInfo, &commandBuffer);
+    VkCommandBuffer command_buffer;
+    vkAllocateCommandBuffers(device_.device(), &alloc_info, &command_buffer);
 
-    VkCommandBufferBeginInfo beginInfo = {};
-    beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    beginInfo.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    const VkCommandBufferBeginInfo begin_info = {
+        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
 
-    vkBeginCommandBuffer(commandBuffer, &beginInfo);
+    vkBeginCommandBuffer(command_buffer, &begin_info);
 
-    return commandBuffer;
+    return command_buffer;
   }
 
-  void end_single_time_commands(VkCommandBuffer commandBuffer)
+  void end_single_time_commands(VkCommandBuffer command_buffer)
   {
-    vkEndCommandBuffer(commandBuffer);
+    vkEndCommandBuffer(command_buffer);
 
-    VkSubmitInfo submitInfo = {};
-    submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &commandBuffer;
+    VkSubmitInfo submit_info = {
+        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+        .commandBufferCount = 1,
+        .pCommandBuffers = &command_buffer,
+    };
 
-    vkQueueSubmit(device_.graphics_queue(), 1, &submitInfo, VK_NULL_HANDLE);
+    vkQueueSubmit(device_.graphics_queue(), 1, &submit_info, VK_NULL_HANDLE);
     vkQueueWaitIdle(device_.graphics_queue());
 
-    vkFreeCommandBuffers(device_.device(), command_pool_, 1, &commandBuffer);
+    vkFreeCommandBuffers(device_.device(), command_pool_, 1, &command_buffer);
   }
 
   void copy_buffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize size)
@@ -1680,13 +1697,9 @@ private:
       vkGetPhysicalDeviceSurfaceSupportKHR(pd, static_cast<uint32_t>(i),
                                            device_.surface(), &presentSupport);
 
-      if (presentSupport) {
-        ids.presentFamily = i;
-      }
+      if (presentSupport) { ids.presentFamily = i; }
 
-      if (ids.is_complete()) {
-        break;
-      }
+      if (ids.is_complete()) { break; }
 
       i++;
     }

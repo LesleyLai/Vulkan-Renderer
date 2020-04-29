@@ -5,15 +5,17 @@
 
 #include <utility>
 
-template <typename T> class UniqueResource {
-public:
-  using Deleter = void(VkDevice, T, const VkAllocationCallbacks*);
+namespace vkh {
 
+template <typename T,
+          void (*deleter)(VkDevice, T, const VkAllocationCallbacks*)>
+class UniqueResource {
+public:
   UniqueResource() noexcept = default;
-  UniqueResource(VkDevice device, T resource, Deleter* deleter,
+  UniqueResource(VkDevice device, T resource,
                  const VkAllocationCallbacks* allocator_ptr = nullptr) noexcept
-      : device_{device}, deleter_{deleter},
-        allocator_ptr_{allocator_ptr}, resource_{std::move(resource)}
+      : device_{device}, allocator_ptr_{allocator_ptr}, resource_{
+                                                            std::move(resource)}
   {
   }
 
@@ -27,9 +29,7 @@ public:
       -> UniqueResource& = delete;
 
   UniqueResource(UniqueResource&& other) noexcept
-      : device_{std::exchange(other.device_, nullptr)}, deleter_{std::exchange(
-                                                            other.deleter_,
-                                                            nullptr)},
+      : device_{std::exchange(other.device_, nullptr)},
         allocator_ptr_{std::exchange(other.allocator_ptr_, nullptr)},
         resource_{std::exchange(other.resource_, nullptr)}
   {
@@ -40,7 +40,6 @@ public:
     if (resource_ != other.resource_) {
       delete_without_reset();
       device_ = std::exchange(other.device_, nullptr);
-      deleter_ = std::exchange(other.deleter_, nullptr);
       allocator_ptr_ = std::exchange(other.allocator_ptr_, nullptr);
       resource_ = std::exchange(other.resource_, nullptr);
     }
@@ -52,7 +51,6 @@ public:
   {
     delete_without_reset();
     device_ = nullptr;
-    deleter_ = nullptr;
     allocator_ptr_ = nullptr;
     resource_ = nullptr;
   }
@@ -67,16 +65,14 @@ public:
     return resource_;
   }
 
-  auto swap(UniqueResource<T>& rhs) noexcept -> void
+  auto swap(UniqueResource& rhs) noexcept -> void
   {
     std::swap(device_, rhs.device_);
-    std::swap(deleter_, rhs.deleter_);
     std::swap(allocator_ptr_, rhs.allocator_ptr_);
     std::swap(resource_, rhs.resource_);
   }
 
-  friend auto swap(UniqueResource<T>& lhs, UniqueResource<T>& rhs) noexcept
-      -> void
+  friend auto swap(UniqueResource& lhs, UniqueResource& rhs) noexcept -> void
   {
     lhs.swap(rhs);
   }
@@ -85,14 +81,15 @@ private:
   auto delete_without_reset() noexcept -> void
   {
     if (resource_ != nullptr) {
-      deleter_(device_, resource_, allocator_ptr_);
+      deleter(device_, resource_, allocator_ptr_);
     }
   }
 
   VkDevice device_ = nullptr;
-  Deleter* deleter_;
   const VkAllocationCallbacks* allocator_ptr_ = nullptr;
   T resource_;
 };
+
+} // namespace vkh
 
 #endif // VULKAN_HELPER_UNIQUE_RESOURCE_HPP
