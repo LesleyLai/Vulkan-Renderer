@@ -1,7 +1,7 @@
 #pragma once
 
-#ifndef VULKAN_RENDERER_SHADER_MODULE_HPP
-#define VULKAN_RENDERER_SHADER_MODULE_HPP
+#ifndef VULKAN_HELPER_SHADER_MODULE_HPP
+#define VULKAN_HELPER_SHADER_MODULE_HPP
 
 #include <vulkan/vulkan_core.h>
 
@@ -28,4 +28,4 @@ struct UniqueShaderModule : UniqueResource<VkShaderModule> {
                                                std::string_view filename)
     -> UniqueShaderModule;
 
-#endif // VULKAN_RENDERER_SHADER_MODULE_HPP
+#endif // VULKAN_HELPER_SHADER_MODULE_HPP

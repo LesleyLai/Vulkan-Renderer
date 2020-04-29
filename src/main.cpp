@@ -14,9 +14,9 @@
 #define TINYOBJLOADER_IMPLEMENTATION
 #include <tiny_obj_loader.h>
 
-#include "wrappers/gpu_device.hpp"
-#include "wrappers/shader_module.hpp"
-#include "wrappers/window.hpp"
+#include "vulkan_helper/gpu_device.hpp"
+#include "vulkan_helper/shader_module.hpp"
+#include "window.hpp"
 
 #include <beyond/math/angle.hpp>
 #include <beyond/types/expected.hpp>
@@ -144,7 +144,7 @@ public:
 
 private:
   Window window_;
-  GPUDevice device_;
+  vkh::GPUDevice device_;
 
   VkSwapchainKHR swapchain_{};
   std::vector<VkImage> swapchain_images_;

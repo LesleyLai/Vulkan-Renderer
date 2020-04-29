@@ -1,9 +1,17 @@
 add_library(vulkan_helper
-        check.hpp)
+        check.hpp
+        gpu_device.hpp
+        gpu_device.cpp
+        shader_module.hpp
+        shader_module.cpp
+        unique_resource.hpp
+        )
 target_link_libraries(vulkan_helper
         PUBLIC
+        beyond::core
         third_party::vma
-        third_party::volk
+        Vulkan::Vulkan
+        vk-bootstrap::vk-bootstrap
         CONAN_PKG::fmt
         PRIVATE
         compiler_options)

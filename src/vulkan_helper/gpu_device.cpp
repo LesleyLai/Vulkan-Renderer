@@ -1,5 +1,5 @@
 #include "gpu_device.hpp"
-#include "window.hpp"
+#include "../window.hpp"
 
 #include <array>
 #include <cstring>
@@ -11,7 +11,10 @@
 
 #include <beyond/utils/panic.hpp>
 
-VkSampleCountFlagBits getMaxUsableSampleCount(const vkb::PhysicalDevice& pd)
+namespace {
+
+auto get_max_usable_sample_count(const vkb::PhysicalDevice& pd) noexcept
+    -> VkSampleCountFlagBits
 {
   VkSampleCountFlags counts =
       pd.properties.limits.framebufferColorSampleCounts &
@@ -37,6 +40,10 @@ VkSampleCountFlagBits getMaxUsableSampleCount(const vkb::PhysicalDevice& pd)
 
   return VK_SAMPLE_COUNT_1_BIT;
 }
+
+} // namespace
+
+namespace vkh {
 
 GPUDevice::GPUDevice(Window& window,
                      ValidationLayerSetting validation_layer_setting) noexcept
@@ -73,7 +80,7 @@ GPUDevice::GPUDevice(Window& window,
   }
 
   physical_device_ = phys_ret->physical_device;
-  msaa_sample_count_ = getMaxUsableSampleCount(*phys_ret);
+  msaa_sample_count_ = get_max_usable_sample_count(*phys_ret);
 
   vkb::DeviceBuilder device_builder{phys_ret.value()};
   auto dev_ret = device_builder.build();
@@ -128,3 +135,5 @@ auto GPUDevice::wait_idle() const noexcept -> void
 {
   vkDeviceWaitIdle(this->device());
 }
+
+} // namespace vkh

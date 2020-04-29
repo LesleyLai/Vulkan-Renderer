@@ -1,7 +1,5 @@
-#ifndef VULKAN_RENDERER_GPU_DEVICE_HPP
-#define VULKAN_RENDERER_GPU_DEVICE_HPP
-
-// #include <volk.h>
+#ifndef VULKAN_HELPER_GPU_DEVICE_HPP
+#define VULKAN_HELPER_GPU_DEVICE_HPP
 
 #include <vulkan/vulkan.h>
 
@@ -9,6 +7,8 @@
 #include <vk_mem_alloc.h>
 
 class Window;
+
+namespace vkh {
 
 enum ValidationLayerSetting { enable = 0, disable = 1 };
 
@@ -24,7 +24,7 @@ class GPUDevice {
   VkQueue compute_queue_;
   VkQueue present_queue_;
 
-  VmaAllocator allocator_;
+  VmaAllocator allocator_{};
 
 public:
   explicit GPUDevice(Window& window,
@@ -86,4 +86,6 @@ public:
   auto wait_idle() const noexcept -> void;
 };
 
-#endif // VULKAN_RENDERER_GPU_DEVICE_HPP
+} // namespace vkh
+
+#endif // VULKAN_HELPER_GPU_DEVICE_HPP
