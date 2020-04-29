@@ -1,5 +1,3 @@
-# add_subdirectory(vulkan_helper)
-
 find_package(Vulkan)
 
 add_executable(app
