@@ -124,10 +124,9 @@ struct UniformBufferObject {
   glm::mat4 proj;
 };
 
-class HelloTriangleApplication {
+class Application {
 public:
-  HelloTriangleApplication()
-      : window_{init_width, init_height, "Vulkan"}, device_{window_}
+  Application() : window_{init_width, init_height, "Vulkan"}, device_{window_}
   {
     glfwSetWindowUserPointer(window_.get(), this);
     glfwSetFramebufferSizeCallback(window_.get(), framebuffer_resize_callback);
@@ -136,10 +135,24 @@ public:
     initVulkan();
   }
 
+  ~Application() noexcept
+  {
+    cleanup();
+  }
+
+  Application(const Application&) = delete;
+  auto operator=(const Application&) = delete;
+  Application(Application&&) = delete;
+  auto operator=(Application&&) = delete;
+
   void run()
   {
-    main_loop();
-    cleanup();
+    while (!window_.should_close()) {
+      glfwPollEvents();
+      draw_frame();
+    }
+
+    device_.wait_idle();
   }
 
 private:
@@ -203,8 +216,8 @@ private:
   static void framebuffer_resize_callback(GLFWwindow* window, int /*width*/,
                                           int /*height*/)
   {
-    auto* app = beyond::bit_cast<HelloTriangleApplication*>(
-        glfwGetWindowUserPointer(window));
+    auto* app =
+        beyond::bit_cast<Application*>(glfwGetWindowUserPointer(window));
     app->framebuffer_resized_ = true;
   }
 
@@ -213,8 +226,8 @@ private:
   {
     using namespace beyond::literals;
 
-    auto* app = beyond::bit_cast<HelloTriangleApplication*>(
-        glfwGetWindowUserPointer(window));
+    auto* app =
+        beyond::bit_cast<Application*>(glfwGetWindowUserPointer(window));
 
     switch (action) {
     case GLFW_PRESS:
@@ -266,16 +279,6 @@ private:
     create_sync_objects();
   }
 
-  void main_loop()
-  {
-    while (!window_.should_close()) {
-      glfwPollEvents();
-      draw_frame();
-    }
-
-    device_.wait_idle();
-  }
-
   void cleanupSwapChain()
   {
     vkDestroyImageView(device_.device(), depth_image_view_, nullptr);
@@ -312,7 +315,7 @@ private:
     vkDestroyDescriptorPool(device_.device(), descriptor_pool_, nullptr);
   }
 
-  void cleanup()
+  void cleanup() noexcept
   {
     cleanupSwapChain();
 
@@ -1710,7 +1713,7 @@ private:
 
 auto main() -> int
 {
-  HelloTriangleApplication app;
+  Application app;
 
   try {
     app.run();
