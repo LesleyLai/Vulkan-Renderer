@@ -12,7 +12,9 @@
 #include <stb_image.h>
 
 #include "mesh.hpp"
+
 #include "vulkan_helper/buffer.hpp"
+#include "vulkan_helper/check.hpp"
 #include "vulkan_helper/gpu_device.hpp"
 #include "vulkan_helper/shader_module.hpp"
 #include "vulkan_helper/swapchain.hpp"
@@ -366,7 +368,7 @@ private:
 
     if (vkCreateRenderPass(device_.device(), &create_info, nullptr,
                            &render_pass_) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create render pass!");
+      beyond::panic("failed to create render pass!");
     }
   }
 
@@ -396,10 +398,8 @@ private:
         .pBindings = bindings.data(),
     };
 
-    if (vkCreateDescriptorSetLayout(device_.device(), &layout_info, nullptr,
-                                    &descriptor_set_layout_) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create descriptor set layout!");
-    }
+    VKH_CHECK(vkCreateDescriptorSetLayout(device_.device(), &layout_info,
+                                          nullptr, &descriptor_set_layout_));
   }
 
   void create_graphics_pipeline()
@@ -581,10 +581,8 @@ private:
         .queueFamilyIndex = queue_family_indices.graphics_family,
     };
 
-    if (vkCreateCommandPool(device_.device(), &create_info, nullptr,
-                            &graphics_command_pool_) != VK_SUCCESS) {
-      beyond::panic("failed to create graphics command pool!");
-    }
+    VKH_CHECK(vkCreateCommandPool(device_.device(), &create_info, nullptr,
+                                  &graphics_command_pool_));
   }
 
   void create_color_resources()
@@ -807,10 +805,8 @@ private:
     samplerInfo.maxLod = static_cast<float>(mip_levels_);
     samplerInfo.mipLodBias = 0;
 
-    if (vkCreateSampler(device_.device(), &samplerInfo, nullptr,
-                        &texture_sampler_) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create texture sampler!");
-    }
+    VKH_CHECK(vkCreateSampler(device_.device(), &samplerInfo, nullptr,
+                              &texture_sampler_));
   }
 
   VkImageView create_image_view(VkImage image, VkFormat format,
@@ -828,13 +824,11 @@ private:
     viewInfo.subresourceRange.baseArrayLayer = 0;
     viewInfo.subresourceRange.layerCount = 1;
 
-    VkImageView imageView;
-    if (vkCreateImageView(device_.device(), &viewInfo, nullptr, &imageView) !=
-        VK_SUCCESS) {
-      throw std::runtime_error("failed to create texture image view!");
-    }
+    VkImageView image_view;
+    VKH_CHECK(
+        vkCreateImageView(device_.device(), &viewInfo, nullptr, &image_view));
 
-    return imageView;
+    return image_view;
   }
 
   void create_image(uint32_t width, uint32_t height, uint32_t mipLevels,
@@ -858,10 +852,7 @@ private:
     imageInfo.samples = numSamples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    if (vkCreateImage(device_.device(), &imageInfo, nullptr, &image) !=
-        VK_SUCCESS) {
-      throw std::runtime_error("failed to create image!");
-    }
+    VKH_CHECK(vkCreateImage(device_.device(), &imageInfo, nullptr, &image));
 
     VkMemoryRequirements memRequirements;
     vkGetImageMemoryRequirements(device_.device(), image, &memRequirements);
@@ -872,10 +863,8 @@ private:
     allocInfo.memoryTypeIndex =
         find_memory_type(memRequirements.memoryTypeBits, properties);
 
-    if (vkAllocateMemory(device_.device(), &allocInfo, nullptr, &imageMemory) !=
-        VK_SUCCESS) {
-      throw std::runtime_error("failed to allocate image memory!");
-    }
+    VKH_CHECK(
+        vkAllocateMemory(device_.device(), &allocInfo, nullptr, &imageMemory));
 
     vkBindImageMemory(device_.device(), image, imageMemory, 0);
   }
@@ -1039,10 +1028,8 @@ private:
         .pPoolSizes = poolSizes.data(),
     };
 
-    if (vkCreateDescriptorPool(device_.device(), &create_info, nullptr,
-                               &descriptor_pool_) != VK_SUCCESS) {
-      throw std::runtime_error("failed to create descriptor pool!");
-    }
+    VKH_CHECK(vkCreateDescriptorPool(device_.device(), &create_info, nullptr,
+                                     &descriptor_pool_));
   }
 
   void create_descriptor_sets()
@@ -1057,10 +1044,8 @@ private:
     };
 
     descriptor_sets_.resize(swapchain_.images().size());
-    if (vkAllocateDescriptorSets(device_.device(), &alloc_info,
-                                 descriptor_sets_.data()) != VK_SUCCESS) {
-      throw std::runtime_error("failed to allocate descriptor sets!");
-    }
+    VKH_CHECK(vkAllocateDescriptorSets(device_.device(), &alloc_info,
+                                       descriptor_sets_.data()));
 
     for (size_t i = 0; i < swapchain_.images().size(); i++) {
       const VkDescriptorBufferInfo buffer_info = {
@@ -1179,19 +1164,14 @@ private:
         .commandBufferCount = static_cast<uint32_t>(command_buffers_.size()),
     };
 
-    if (vkAllocateCommandBuffers(device_.device(), &alloc_info,
-                                 command_buffers_.data()) != VK_SUCCESS) {
-      throw std::runtime_error("failed to allocate command buffers!");
-    }
+    VKH_CHECK(vkAllocateCommandBuffers(device_.device(), &alloc_info,
+                                       command_buffers_.data()));
 
     for (size_t i = 0; i < command_buffers_.size(); i++) {
       VkCommandBufferBeginInfo begin_info = {
           .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
 
-      if (vkBeginCommandBuffer(command_buffers_[i], &begin_info) !=
-          VK_SUCCESS) {
-        throw std::runtime_error("failed to begin recording command buffer!");
-      }
+      VKH_CHECK(vkBeginCommandBuffer(command_buffers_[i], &begin_info));
 
       constexpr std::array clear_values = {
           VkClearValue{.color = {{0.0f, 0.0f, 0.0f, 1.0f}}},
@@ -1232,9 +1212,7 @@ private:
 
       vkCmdEndRenderPass(command_buffers_[i]);
 
-      if (vkEndCommandBuffer(command_buffers_[i]) != VK_SUCCESS) {
-        throw std::runtime_error("failed to record command buffer!");
-      }
+      VKH_CHECK(vkEndCommandBuffer(command_buffers_[i]));
     }
   }
 
@@ -1303,7 +1281,7 @@ private:
       recreate_swapchain();
       return;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
-      throw std::runtime_error("failed to acquire swap chain image!");
+      beyond::panic("failed to acquire swap chain image!");
     }
 
     update_uniform_buffer(image_index);
@@ -1335,10 +1313,8 @@ private:
 
     vkResetFences(device_.device(), 1, &in_flight_fences_[current_frame_]);
 
-    if (vkQueueSubmit(device_.graphics_queue(), 1, &submit_info,
-                      in_flight_fences_[current_frame_]) != VK_SUCCESS) {
-      throw std::runtime_error("failed to submit draw command buffer!");
-    }
+    VKH_CHECK(vkQueueSubmit(device_.graphics_queue(), 1, &submit_info,
+                            in_flight_fences_[current_frame_]));
 
     const std::array swapchains{swapchain_.get()};
 
@@ -1358,7 +1334,7 @@ private:
       framebuffer_resized_ = false;
       recreate_swapchain();
     } else if (result != VK_SUCCESS) {
-      throw std::runtime_error("failed to present swap chain image!");
+      beyond::panic("failed to present swap chain image!");
     }
 
     current_frame_ = (current_frame_ + 1) % max_frames_in_flight;
