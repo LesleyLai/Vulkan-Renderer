@@ -11,7 +11,7 @@ add_executable(app
 
         utils/vma_source.cpp
         utils/utils.hpp
-        )
+        mesh.cpp mesh.hpp)
 target_link_libraries(app
         PRIVATE compiler_options
         vulkan_helper

@@ -15,9 +15,7 @@
 
 Window::~Window() noexcept
 {
-  if (pimpl_) {
-    glfwTerminate();
-  }
+  if (pimpl_) { glfwTerminate(); }
 }
 
 Window::Window(Window&& other) noexcept = default;
@@ -45,9 +43,7 @@ Window::Window(int width, int height, std::string title) noexcept
   auto glfw_window =
       glfwCreateWindow(width, height, title_.data(), nullptr, nullptr);
 
-  if (!glfw_window) {
-    beyond::panic("Cannot Create a GLFW Window");
-  }
+  if (!glfw_window) { beyond::panic("Cannot Create a GLFW Window"); }
 
   pimpl_ = std::make_unique<WindowImpl>(glfw_window);
   glfwMakeContextCurrent(pimpl_->data_);

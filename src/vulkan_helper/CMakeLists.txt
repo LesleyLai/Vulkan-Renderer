@@ -12,6 +12,7 @@ target_link_libraries(vulkan_helper
         third_party::vma
         Vulkan::Vulkan
         vk-bootstrap::vk-bootstrap
+        CONAN_PKG::assimp
         CONAN_PKG::fmt
         PRIVATE
         compiler_options)
