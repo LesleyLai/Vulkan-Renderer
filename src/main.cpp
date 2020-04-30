@@ -12,8 +12,10 @@
 #include <stb_image.h>
 
 #include "mesh.hpp"
+#include "vulkan_helper/buffer.hpp"
 #include "vulkan_helper/gpu_device.hpp"
 #include "vulkan_helper/shader_module.hpp"
+
 #include "window.hpp"
 
 #include <beyond/math/angle.hpp>
@@ -73,7 +75,7 @@ public:
     glfwSetFramebufferSizeCallback(window_.get(), framebuffer_resize_callback);
     glfwSetKeyCallback(window_.get(), key_callback);
 
-    initVulkan();
+    init_vulkan();
   }
 
   ~Application() noexcept
@@ -129,13 +131,9 @@ private:
   VkSampler texture_sampler_{};
 
   Mesh mesh_;
-  VkBuffer vertex_buffer_{};
-  VmaAllocation vertex_buffer_allocation_{};
-  VkBuffer index_buffer_{};
-  VmaAllocation index_buffer_allocation_{};
-
-  std::vector<VkBuffer> uniform_buffers_;
-  std::vector<VmaAllocation> uniform_buffers_allocation_;
+  vkh::UniqueBuffer vertex_buffer_;
+  vkh::UniqueBuffer index_buffer_;
+  std::vector<vkh::UniqueBuffer> uniform_buffers_;
 
   VkDescriptorPool descriptor_pool_{};
   std::vector<VkDescriptorSet> descriptor_sets_;
@@ -195,7 +193,7 @@ private:
     }
   }
 
-  void initVulkan()
+  void init_vulkan()
   {
     create_swapchain();
     create_image_views();
@@ -219,7 +217,7 @@ private:
     create_sync_objects();
   }
 
-  void cleanupSwapChain()
+  void cleanup_swapchain()
   {
     vkDestroyImageView(device_.device(), depth_image_view_, nullptr);
     vkDestroyImage(device_.device(), depth_image_, nullptr);
@@ -248,8 +246,7 @@ private:
     vkDestroySwapchainKHR(device_.device(), swapchain_, nullptr);
 
     for (size_t i = 0; i < swapchain_images_.size(); i++) {
-      vmaDestroyBuffer(device_.allocator(), uniform_buffers_[i],
-                       uniform_buffers_allocation_[i]);
+      uniform_buffers_[i].reset();
     }
 
     vkDestroyDescriptorPool(device_.device(), descriptor_pool_, nullptr);
@@ -257,7 +254,7 @@ private:
 
   void cleanup() noexcept
   {
-    cleanupSwapChain();
+    cleanup_swapchain();
 
     vkDestroySampler(device_.device(), texture_sampler_, nullptr);
     vkDestroyImageView(device_.device(), texture_image_view_, nullptr);
@@ -268,10 +265,8 @@ private:
     vkDestroyDescriptorSetLayout(device_.device(), descriptor_set_layout_,
                                  nullptr);
 
-    vmaDestroyBuffer(device_.allocator(), index_buffer_,
-                     index_buffer_allocation_);
-    vmaDestroyBuffer(device_.allocator(), vertex_buffer_,
-                     vertex_buffer_allocation_);
+    index_buffer_.reset();
+    vertex_buffer_.reset();
 
     for (size_t i = 0; i < max_frames_in_flight; i++) {
       vkDestroySemaphore(device_.device(), render_finished_semaphores_[i],
@@ -284,7 +279,7 @@ private:
     vkDestroyCommandPool(device_.device(), command_pool_, nullptr);
   }
 
-  void recreateSwapChain()
+  void recreate_swapchain()
   {
     int width = 0, height = 0;
     glfwGetFramebufferSize(window_.get(), &width, &height);
@@ -295,7 +290,7 @@ private:
 
     vkDeviceWaitIdle(device_.device());
 
-    cleanupSwapChain();
+    cleanup_swapchain();
 
     create_swapchain();
     create_image_views();
@@ -752,15 +747,16 @@ private:
 
     if (!pixels) { throw std::runtime_error("failed to load texture image!"); }
 
-    auto [staging_buffer, staging_buffer_allocation] =
-        create_buffer(image_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                      VMA_MEMORY_USAGE_CPU_TO_GPU)
+    auto staging_buffer =
+        vkh::create_unique_buffer(device_.allocator(), image_size,
+                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                  VMA_MEMORY_USAGE_CPU_TO_GPU)
             .value();
 
     void* data = nullptr;
-    vmaMapMemory(device_.allocator(), staging_buffer_allocation, &data);
+    staging_buffer.map(&data);
     memcpy(data, pixels, image_size);
-    vmaUnmapMemory(device_.allocator(), staging_buffer_allocation);
+    staging_buffer.unmap();
 
     stbi_image_free(pixels);
 
@@ -781,9 +777,6 @@ private:
                          static_cast<uint32_t>(tex_height));
     // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating
     // mipmaps
-
-    vmaDestroyBuffer(device_.allocator(), staging_buffer,
-                     staging_buffer_allocation);
 
     generate_mipmaps(texture_image_, VK_FORMAT_R8G8B8A8_SRGB, tex_width,
                      tex_height, mip_levels_);
@@ -1056,69 +1049,64 @@ private:
     VkDeviceSize buffer_size =
         sizeof(mesh_.vertices[0]) * mesh_.vertices.size();
 
-    auto [staging_buffer, staging_buffer_allocation] =
-        create_buffer(buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                      VMA_MEMORY_USAGE_CPU_TO_GPU)
+    auto staging_buffer =
+        vkh::create_unique_buffer(device_.allocator(), buffer_size,
+                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                  VMA_MEMORY_USAGE_CPU_TO_GPU)
             .value();
 
     void* data = nullptr;
-    vmaMapMemory(device_.allocator(), staging_buffer_allocation, &data);
+    staging_buffer.map(&data);
     memcpy(data, mesh_.vertices.data(), buffer_size);
-    vmaUnmapMemory(device_.allocator(), staging_buffer_allocation);
+    staging_buffer.unmap();
 
-    std::tie(vertex_buffer_, vertex_buffer_allocation_) =
-        create_buffer(buffer_size,
-                      VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                          VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                      VMA_MEMORY_USAGE_GPU_ONLY)
+    vertex_buffer_ =
+        vkh::create_unique_buffer(device_.allocator(), buffer_size,
+                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+                                  VMA_MEMORY_USAGE_GPU_ONLY)
             .value();
 
     copy_buffer(staging_buffer, vertex_buffer_, buffer_size);
-
-    vmaDestroyBuffer(device_.allocator(), staging_buffer,
-                     staging_buffer_allocation);
   }
 
   void create_index_buffer()
   {
     VkDeviceSize buffer_size = sizeof(mesh_.indices[0]) * mesh_.indices.size();
 
-    auto [staging_buffer, staging_buffer_allocation] =
-        create_buffer(buffer_size, VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                      VMA_MEMORY_USAGE_CPU_TO_GPU)
+    auto staging_buffer =
+        vkh::create_unique_buffer(device_.allocator(), buffer_size,
+                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+                                  VMA_MEMORY_USAGE_CPU_TO_GPU)
             .value();
 
     void* data = nullptr;
-    vmaMapMemory(device_.allocator(), staging_buffer_allocation, &data);
+    staging_buffer.map(&data);
     memcpy(data, mesh_.indices.data(), buffer_size);
-    vmaUnmapMemory(device_.allocator(), staging_buffer_allocation);
+    staging_buffer.unmap();
 
-    auto index_buffer_creation_result = create_buffer(
-        buffer_size,
-        VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-        VMA_MEMORY_USAGE_GPU_ONLY);
-
-    std::tie(index_buffer_, index_buffer_allocation_) =
-        index_buffer_creation_result.value();
+    index_buffer_ =
+        vkh::create_unique_buffer(device_.allocator(), buffer_size,
+                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
+                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+                                  VMA_MEMORY_USAGE_GPU_ONLY)
+            .value();
 
     copy_buffer(staging_buffer, index_buffer_, buffer_size);
-
-    vmaDestroyBuffer(device_.allocator(), staging_buffer,
-                     staging_buffer_allocation);
   }
 
   void create_uniform_buffers()
   {
-    VkDeviceSize bufferSize = sizeof(UniformBufferObject);
+    constexpr VkDeviceSize buffer_size = sizeof(UniformBufferObject);
 
-    uniform_buffers_.resize(swapchain_images_.size());
-    uniform_buffers_allocation_.resize(swapchain_images_.size());
+    uniform_buffers_.reserve(swapchain_images_.size());
 
     for (size_t i = 0; i < swapchain_images_.size(); i++) {
-      std::tie(uniform_buffers_[i], uniform_buffers_allocation_[i]) =
-          create_buffer(bufferSize, VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
-                        VMA_MEMORY_USAGE_CPU_TO_GPU)
-              .value();
+      uniform_buffers_.push_back(
+          vkh::create_unique_buffer(device_.allocator(), buffer_size,
+                                    VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT,
+                                    VMA_MEMORY_USAGE_CPU_TO_GPU)
+              .value());
     }
   }
 
@@ -1200,42 +1188,6 @@ private:
       vkUpdateDescriptorSets(device_.device(),
                              static_cast<uint32_t>(descriptor_writes.size()),
                              descriptor_writes.data(), 0, nullptr);
-    }
-  }
-
-  struct VmaCreateBufferResult {
-    VkBuffer buffer = nullptr;
-    VmaAllocation allocation = nullptr;
-
-    /*implicit*/ operator std::tuple<VkBuffer&, VmaAllocation&>()
-    {
-      return {buffer, allocation};
-    }
-  };
-
-  auto create_buffer(VkDeviceSize size, VkBufferUsageFlags usage,
-                     VmaMemoryUsage memory_usage)
-      -> beyond::expected<VmaCreateBufferResult, VkResult>
-  {
-    const VkBufferCreateInfo buffer_create_info = {
-        .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-        .size = size,
-        .usage = usage,
-        .sharingMode = VK_SHARING_MODE_EXCLUSIVE,
-    };
-
-    const VmaAllocationCreateInfo allocation_create_info = {.usage =
-                                                                memory_usage};
-
-    VkBuffer buffer = nullptr;
-    VmaAllocation allocation = nullptr;
-    if (const auto result = vmaCreateBuffer(
-            device_.allocator(), &buffer_create_info, &allocation_create_info,
-            &buffer, &allocation, nullptr);
-        result != VK_SUCCESS) {
-      return beyond::unexpected{result};
-    } else {
-      return VmaCreateBufferResult{buffer, allocation};
     }
   }
 
@@ -1404,26 +1356,25 @@ private:
 
   void update_uniform_buffer(uint32_t current_image)
   {
-    UniformBufferObject ubo = {};
-    ubo.model = glm::rotate(glm::mat4(1.0f), rotation_z_.value(),
-                            glm::vec3(0.0f, 0.0f, 1.0f)) *
-                glm::rotate(glm::mat4(1.0f), rotation_x_.value(),
-                            glm::vec3(1.0f, 0.0f, 0.0f));
-    ubo.view =
-        glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f), glm::vec3(0.0f, 0.0f, 0.0f),
-                    glm::vec3(0.0f, 0.0f, 1.0f));
-    ubo.proj =
-        glm::perspective(glm::radians(45.0f),
-                         static_cast<float>(swapchain_extent_.width) /
-                             static_cast<float>(swapchain_extent_.height),
-                         0.1f, 10.0f);
+    const UniformBufferObject ubo = {
+        .model = glm::rotate(glm::mat4(1.0f), rotation_z_.value(),
+                             glm::vec3(0.0f, 0.0f, 1.0f)) *
+                 glm::rotate(glm::mat4(1.0f), rotation_x_.value(),
+                             glm::vec3(1.0f, 0.0f, 0.0f)),
+        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
+                            glm::vec3(0.0f, 0.0f, 0.0f),
+                            glm::vec3(0.0f, 0.0f, 1.0f)),
+        .proj =
+            glm::perspective(glm::radians(45.0f),
+                             static_cast<float>(swapchain_extent_.width) /
+                                 static_cast<float>(swapchain_extent_.height),
+                             0.1f, 10.0f),
+    };
 
     void* data = nullptr;
-    vmaMapMemory(device_.allocator(),
-                 uniform_buffers_allocation_[current_image], &data);
+    uniform_buffers_[current_image].map(&data);
     memcpy(data, &ubo, sizeof(ubo));
-    vmaUnmapMemory(device_.allocator(),
-                   uniform_buffers_allocation_[current_image]);
+    uniform_buffers_[current_image].unmap();
   }
 
   void draw_frame()
@@ -1438,7 +1389,7 @@ private:
                               VK_NULL_HANDLE, &image_index);
 
     if (result == VK_ERROR_OUT_OF_DATE_KHR) {
-      recreateSwapChain();
+      recreate_swapchain();
       return;
     } else if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) {
       throw std::runtime_error("failed to acquire swap chain image!");
@@ -1492,7 +1443,7 @@ private:
     if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR ||
         framebuffer_resized_) {
       framebuffer_resized_ = false;
-      recreateSwapChain();
+      recreate_swapchain();
     } else if (result != VK_SUCCESS) {
       throw std::runtime_error("failed to present swap chain image!");
     }

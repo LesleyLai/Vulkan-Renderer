@@ -5,7 +5,7 @@ add_library(vulkan_helper
         shader_module.hpp
         shader_module.cpp
         unique_resource.hpp
-        )
+        buffer.cpp buffer.hpp)
 target_link_libraries(vulkan_helper
         PUBLIC
         beyond::core
