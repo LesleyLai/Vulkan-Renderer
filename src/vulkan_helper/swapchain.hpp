@@ -49,35 +49,41 @@ public:
     return swapchain_;
   }
 
+  [[nodiscard]] auto image_count() const noexcept -> std::uint32_t
+  {
+    return images_count_;
+  }
+
   [[nodiscard]] auto image_format() const noexcept -> VkFormat
   {
-    return swapchain_images_format_;
+    return images_format_;
   }
 
   [[nodiscard]] auto images() const noexcept -> const std::vector<VkImage>&
   {
-    return swapchain_images_;
+    return images_;
   }
 
   [[nodiscard]] auto image_views() const noexcept
       -> const std::vector<VkImageView>&
   {
-    return swapchain_image_views_;
+    return image_views_;
   }
 
   [[nodiscard]] auto extent() const noexcept -> VkExtent2D
   {
-    return swapchain_extent_;
+    return extent_;
   }
 
 private:
   VkDevice device_ = nullptr;
   VkSwapchainKHR swapchain_ = nullptr;
-  std::vector<VkImage> swapchain_images_;
-  std::vector<VkImageView> swapchain_image_views_;
+  std::uint32_t images_count_;
+  std::vector<VkImage> images_;
+  std::vector<VkImageView> image_views_;
 
-  VkFormat swapchain_images_format_ = VK_FORMAT_UNDEFINED;
-  VkExtent2D swapchain_extent_{};
+  VkFormat images_format_ = VK_FORMAT_UNDEFINED;
+  VkExtent2D extent_{};
 };
 
 } // namespace vkh
