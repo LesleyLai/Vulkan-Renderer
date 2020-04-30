@@ -17,6 +17,7 @@
 #include "vulkan_helper/check.hpp"
 #include "vulkan_helper/gpu_device.hpp"
 #include "vulkan_helper/shader_module.hpp"
+#include "vulkan_helper/single_time_command.hpp"
 #include "vulkan_helper/swapchain.hpp"
 
 #include "window.hpp"
@@ -689,78 +690,81 @@ private:
       beyond::panic("texture image format does not support linear blitting!");
     }
 
-    execute_single_time_command([&](VkCommandBuffer command_buffer) {
-      VkImageMemoryBarrier barrier = {
-          .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-          .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-          .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-          .image = image,
-          .subresourceRange = {
-              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-              .levelCount = 1,
-              .baseArrayLayer = 0,
-              .layerCount = 1,
-          }};
+    vkh::execute_single_time_command(
+        device_.device(), graphics_command_pool_, device_.graphics_queue(),
+        [&](VkCommandBuffer command_buffer) {
+          VkImageMemoryBarrier barrier = {
+              .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+              .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+              .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+              .image = image,
+              .subresourceRange = {
+                  .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                  .levelCount = 1,
+                  .baseArrayLayer = 0,
+                  .layerCount = 1,
+              }};
 
-      int32_t mip_width = tex_width;
-      int32_t mip_height = tex_height;
+          int32_t mip_width = tex_width;
+          int32_t mip_height = tex_height;
 
-      for (uint32_t i = 1; i < mip_levels; ++i) {
-        barrier.subresourceRange.baseMipLevel = i - 1;
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+          for (uint32_t i = 1; i < mip_levels; ++i) {
+            barrier.subresourceRange.baseMipLevel = i - 1;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
 
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr, 0,
-                             nullptr, 1, &barrier);
+            vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_TRANSFER_BIT, 0, 0, nullptr,
+                                 0, nullptr, 1, &barrier);
 
-        const VkImageBlit blit = {
-            .srcSubresource{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .mipLevel = i - 1,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-            .srcOffsets = {{0, 0, 0}, {mip_width, mip_height, 1}},
-            .dstSubresource{
-                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                .mipLevel = i,
-                .baseArrayLayer = 0,
-                .layerCount = 1,
-            },
-            .dstOffsets = {{0, 0, 0},
-                           {mip_width > 1 ? mip_width / 2 : 1,
-                            mip_height > 1 ? mip_height / 2 : 1, 1}}};
+            const VkImageBlit blit = {
+                .srcSubresource{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = i - 1,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+                .srcOffsets = {{0, 0, 0}, {mip_width, mip_height, 1}},
+                .dstSubresource{
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = i,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+                .dstOffsets = {{0, 0, 0},
+                               {mip_width > 1 ? mip_width / 2 : 1,
+                                mip_height > 1 ? mip_height / 2 : 1, 1}}};
 
-        vkCmdBlitImage(
-            command_buffer, image, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
-            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit, VK_FILTER_LINEAR);
+            vkCmdBlitImage(command_buffer, image,
+                           VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, image,
+                           VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &blit,
+                           VK_FILTER_LINEAR);
 
-        barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
-        barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+            barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                             VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
-                             nullptr, 0, nullptr, 1, &barrier);
+            vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                                 VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+                                 nullptr, 0, nullptr, 1, &barrier);
 
-        if (mip_width > 1) mip_width /= 2;
-        if (mip_height > 1) mip_height /= 2;
-      }
+            if (mip_width > 1) mip_width /= 2;
+            if (mip_height > 1) mip_height /= 2;
+          }
 
-      barrier.subresourceRange.baseMipLevel = mip_levels - 1;
-      barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
-      barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-      barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-      barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+          barrier.subresourceRange.baseMipLevel = mip_levels - 1;
+          barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+          barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+          barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+          barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-      vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
-                           VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0, nullptr,
-                           0, nullptr, 1, &barrier);
-    });
+          vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_TRANSFER_BIT,
+                               VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0, 0,
+                               nullptr, 0, nullptr, 1, &barrier);
+        });
   }
 
   void create_texture_image_view()
@@ -858,70 +862,75 @@ private:
                                VkImageLayout old_layout,
                                VkImageLayout new_layout, uint32_t mip_levels)
   {
-    execute_single_time_command([&](VkCommandBuffer command_buffer) {
-      VkImageMemoryBarrier barrier = {
-          .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-          .oldLayout = old_layout,
-          .newLayout = new_layout,
-          .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-          .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-          .image = image,
-          .subresourceRange{
-              .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-              .baseMipLevel = 0,
-              .levelCount = mip_levels,
-              .baseArrayLayer = 0,
-              .layerCount = 1,
-          }};
+    vkh::execute_single_time_command(
+        device_.device(), graphics_command_pool_, device_.graphics_queue(),
+        [&](VkCommandBuffer command_buffer) {
+          VkImageMemoryBarrier barrier = {
+              .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+              .oldLayout = old_layout,
+              .newLayout = new_layout,
+              .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+              .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+              .image = image,
+              .subresourceRange{
+                  .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                  .baseMipLevel = 0,
+                  .levelCount = mip_levels,
+                  .baseArrayLayer = 0,
+                  .layerCount = 1,
+              }};
 
-      VkPipelineStageFlags source_stage;
-      VkPipelineStageFlags destination_stage;
+          VkPipelineStageFlags source_stage;
+          VkPipelineStageFlags destination_stage;
 
-      if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
-          new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-        barrier.srcAccessMask = 0;
-        barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+          if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
+              new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+            barrier.srcAccessMask = 0;
+            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
 
-        source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-        destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-      } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-                 new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-        barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-        barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+            source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+            destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+          } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+                     new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
 
-        source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-        destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-      } else {
-        beyond::panic("unsupported layout transition!");
-      }
+            source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+            destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+          } else {
+            beyond::panic("unsupported layout transition!");
+          }
 
-      vkCmdPipelineBarrier(command_buffer, source_stage, destination_stage, 0,
-                           0, nullptr, 0, nullptr, 1, &barrier);
-    });
+          vkCmdPipelineBarrier(command_buffer, source_stage, destination_stage,
+                               0, 0, nullptr, 0, nullptr, 1, &barrier);
+        });
   }
 
   void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t width,
                             uint32_t height)
   {
-    execute_single_time_command([&](VkCommandBuffer command_buffer) {
-      const VkBufferImageCopy region = {
-          .bufferOffset = 0,
-          .bufferRowLength = 0,
-          .bufferImageHeight = 0,
-          .imageSubresource =
-              {
-                  .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                  .mipLevel = 0,
-                  .baseArrayLayer = 0,
-                  .layerCount = 1,
-              },
-          .imageOffset = {0, 0, 0},
-          .imageExtent = {width, height, 1},
-      };
+    vkh::execute_single_time_command(
+        device_.device(), graphics_command_pool_, device_.graphics_queue(),
+        [&](VkCommandBuffer command_buffer) {
+          const VkBufferImageCopy region = {
+              .bufferOffset = 0,
+              .bufferRowLength = 0,
+              .bufferImageHeight = 0,
+              .imageSubresource =
+                  {
+                      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                      .mipLevel = 0,
+                      .baseArrayLayer = 0,
+                      .layerCount = 1,
+                  },
+              .imageOffset = {0, 0, 0},
+              .imageExtent = {width, height, 1},
+          };
 
-      vkCmdCopyBufferToImage(command_buffer, buffer, image,
-                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
-    });
+          vkCmdCopyBufferToImage(command_buffer, buffer, image,
+                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                                 &region);
+        });
   }
 
   void create_vertex_buffer()
@@ -947,7 +956,8 @@ private:
                                   VMA_MEMORY_USAGE_GPU_ONLY)
             .value();
 
-    copy_buffer(staging_buffer, vertex_buffer_, buffer_size);
+    vkh::copy_buffer(device_, graphics_command_pool_, device_.graphics_queue(),
+                     staging_buffer, vertex_buffer_, buffer_size);
   }
 
   void create_index_buffer()
@@ -972,7 +982,8 @@ private:
                                   VMA_MEMORY_USAGE_GPU_ONLY)
             .value();
 
-    copy_buffer(staging_buffer, index_buffer_, buffer_size);
+    vkh::copy_buffer(device_, graphics_command_pool_, device_.graphics_queue(),
+                     staging_buffer, index_buffer_, buffer_size);
   }
 
   void create_uniform_buffers()
@@ -1067,49 +1078,6 @@ private:
                              static_cast<uint32_t>(descriptor_writes.size()),
                              descriptor_writes.data(), 0, nullptr);
     }
-  }
-
-  template <typename Func> auto execute_single_time_command(Func&& func) -> void
-  {
-    const VkCommandBufferAllocateInfo alloc_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = graphics_command_pool_,
-        .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
-        .commandBufferCount = 1,
-    };
-
-    VkCommandBuffer command_buffer;
-    vkAllocateCommandBuffers(device_.device(), &alloc_info, &command_buffer);
-
-    const VkCommandBufferBeginInfo begin_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
-        .flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT};
-
-    vkBeginCommandBuffer(command_buffer, &begin_info);
-
-    std::forward<Func>(func)(command_buffer);
-
-    vkEndCommandBuffer(command_buffer);
-
-    const VkSubmitInfo submit_info = {
-        .sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-        .commandBufferCount = 1,
-        .pCommandBuffers = &command_buffer,
-    };
-
-    vkQueueSubmit(device_.graphics_queue(), 1, &submit_info, VK_NULL_HANDLE);
-    vkQueueWaitIdle(device_.graphics_queue());
-
-    vkFreeCommandBuffers(device_.device(), graphics_command_pool_, 1,
-                         &command_buffer);
-  }
-
-  void copy_buffer(VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size)
-  {
-    execute_single_time_command([&](VkCommandBuffer command_buffer) {
-      VkBufferCopy copyRegion = {.size = size};
-      vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, 1, &copyRegion);
-    });
   }
 
   auto find_memory_type(uint32_t typeFilter, VkMemoryPropertyFlags properties)

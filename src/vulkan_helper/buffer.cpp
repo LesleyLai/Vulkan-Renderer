@@ -1,4 +1,5 @@
 #include "buffer.hpp"
+#include "single_time_command.hpp"
 
 namespace vkh {
 
@@ -35,6 +36,17 @@ auto create_unique_buffer(VmaAllocator allocator, VkDeviceSize size,
   return create_buffer(allocator, size, usage, memory_usage)
       .map([&allocator](VmaCreateBufferResult result) {
         return UniqueBuffer(allocator, result.buffer, result.allocation);
+      });
+}
+
+void copy_buffer(GPUDevice& device, VkCommandPool command_pool, VkQueue queue,
+                 VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size)
+{
+  vkh::execute_single_time_command(
+      device.device(), command_pool, queue,
+      [&](VkCommandBuffer command_buffer) {
+        VkBufferCopy copyRegion = {.size = size};
+        vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, 1, &copyRegion);
       });
 }
 

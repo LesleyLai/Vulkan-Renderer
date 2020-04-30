@@ -94,6 +94,9 @@ auto create_unique_buffer(VmaAllocator allocator, VkDeviceSize size,
                           VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
     -> beyond::expected<UniqueBuffer, VkResult>;
 
+void copy_buffer(GPUDevice& device, VkCommandPool command_pool, VkQueue queue,
+                 VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size);
+
 } // namespace vkh
 
 #endif // VULKAN_RENDERER_BUFFER_HPP

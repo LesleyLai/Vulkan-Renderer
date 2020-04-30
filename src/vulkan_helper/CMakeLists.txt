@@ -7,7 +7,7 @@ add_library(vulkan_helper
         swapchain.hpp
         swapchain.cpp
         unique_resource.hpp
-        buffer.cpp buffer.hpp)
+        buffer.cpp buffer.hpp single_time_command.hpp single_time_command.cpp)
 target_link_libraries(vulkan_helper
         PUBLIC
         beyond::core
