@@ -9,8 +9,9 @@
 #include <glm/gtx/hash.hpp>
 
 #include <array>
-#include <vector>
 #include <vulkan/vulkan_core.h>
+
+#include "vulkan_helper/buffer.hpp"
 
 struct Vertex {
   glm::vec3 pos;
@@ -57,11 +58,13 @@ struct Vertex {
   }
 };
 
-struct Mesh {
-  std::vector<Vertex> vertices;
-  std::vector<uint32_t> indices;
+struct StaticMesh {
+  vkh::UniqueBuffer vertex_buffer;
+  vkh::UniqueBuffer index_buffer;
+  std::uint32_t indices_size;
 };
 
-[[nodiscard]] auto load_mesh(const char* path) -> Mesh;
+[[nodiscard]] auto load_mesh(vkh::GPUDevice& device, VkCommandPool command_pool,
+                             VkQueue queue, const char* path) -> StaticMesh;
 
 #endif // VULKAN_RENDERER_MESH_HPP

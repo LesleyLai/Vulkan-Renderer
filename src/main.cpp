@@ -6,7 +6,6 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
-#include <glm/gtx/hash.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -113,9 +112,7 @@ private:
   VkImageView texture_image_view_{};
   VkSampler texture_sampler_{};
 
-  Mesh mesh_;
-  vkh::UniqueBuffer vertex_buffer_;
-  vkh::UniqueBuffer index_buffer_;
+  StaticMesh mesh_;
   std::vector<vkh::UniqueBuffer> uniform_buffers_;
 
   VkDescriptorPool descriptor_pool_{};
@@ -189,9 +186,8 @@ private:
     create_texture_image();
     create_texture_image_view();
     create_texture_sampler();
-    mesh_ = load_mesh(model_path);
-    create_vertex_buffer();
-    create_index_buffer();
+    mesh_ = load_mesh(device_, graphics_command_pool_, device_.graphics_queue(),
+                      model_path);
     create_uniform_buffers();
     create_descriptor_pool();
     create_descriptor_sets();
@@ -243,8 +239,8 @@ private:
     vkDestroyDescriptorSetLayout(device_.device(), descriptor_set_layout_,
                                  nullptr);
 
-    index_buffer_.reset();
-    vertex_buffer_.reset();
+    mesh_.index_buffer.reset();
+    mesh_.vertex_buffer.reset();
 
     for (size_t i = 0; i < max_frames_in_flight; i++) {
       vkDestroySemaphore(device_.device(), render_finished_semaphores_[i],
@@ -933,59 +929,6 @@ private:
         });
   }
 
-  void create_vertex_buffer()
-  {
-    VkDeviceSize buffer_size =
-        sizeof(mesh_.vertices[0]) * mesh_.vertices.size();
-
-    auto staging_buffer =
-        vkh::create_unique_buffer(device_.allocator(), buffer_size,
-                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                  VMA_MEMORY_USAGE_CPU_TO_GPU)
-            .value();
-
-    void* data = nullptr;
-    staging_buffer.map(&data);
-    memcpy(data, mesh_.vertices.data(), buffer_size);
-    staging_buffer.unmap();
-
-    vertex_buffer_ =
-        vkh::create_unique_buffer(device_.allocator(), buffer_size,
-                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                                      VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
-                                  VMA_MEMORY_USAGE_GPU_ONLY)
-            .value();
-
-    vkh::copy_buffer(device_, graphics_command_pool_, device_.graphics_queue(),
-                     staging_buffer, vertex_buffer_, buffer_size);
-  }
-
-  void create_index_buffer()
-  {
-    VkDeviceSize buffer_size = sizeof(mesh_.indices[0]) * mesh_.indices.size();
-
-    auto staging_buffer =
-        vkh::create_unique_buffer(device_.allocator(), buffer_size,
-                                  VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
-                                  VMA_MEMORY_USAGE_CPU_TO_GPU)
-            .value();
-
-    void* data = nullptr;
-    staging_buffer.map(&data);
-    memcpy(data, mesh_.indices.data(), buffer_size);
-    staging_buffer.unmap();
-
-    index_buffer_ =
-        vkh::create_unique_buffer(device_.allocator(), buffer_size,
-                                  VK_BUFFER_USAGE_TRANSFER_DST_BIT |
-                                      VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
-                                  VMA_MEMORY_USAGE_GPU_ONLY)
-            .value();
-
-    vkh::copy_buffer(device_, graphics_command_pool_, device_.graphics_queue(),
-                     staging_buffer, index_buffer_, buffer_size);
-  }
-
   void create_uniform_buffers()
   {
     constexpr VkDeviceSize buffer_size = sizeof(UniformBufferObject);
@@ -1140,21 +1083,19 @@ private:
       vkCmdBindPipeline(command_buffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
                         graphics_pipeline_);
 
-      VkBuffer vertex_buffers[] = {vertex_buffer_};
+      VkBuffer vertex_buffers[] = {mesh_.vertex_buffer};
       VkDeviceSize offsets[] = {0};
       vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, vertex_buffers,
                              offsets);
 
-      vkCmdBindIndexBuffer(command_buffers_[i], index_buffer_, 0,
+      vkCmdBindIndexBuffer(command_buffers_[i], mesh_.index_buffer, 0,
                            VK_INDEX_TYPE_UINT32);
 
       vkCmdBindDescriptorSets(command_buffers_[i],
                               VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_,
                               0, 1, &descriptor_sets_[i], 0, nullptr);
 
-      vkCmdDrawIndexed(command_buffers_[i],
-                       static_cast<uint32_t>(mesh_.indices.size()), 1, 0, 0, 0);
-
+      vkCmdDrawIndexed(command_buffers_[i], mesh_.indices_size, 1, 0, 0, 0);
       vkCmdEndRenderPass(command_buffers_[i]);
 
       VKH_CHECK(vkEndCommandBuffer(command_buffers_[i]));
@@ -1168,19 +1109,20 @@ private:
     in_flight_fences_.resize(max_frames_in_flight);
     images_in_flight_.resize(swapchain_.images().size(), VK_NULL_HANDLE);
 
-    VkSemaphoreCreateInfo semaphoreInfo = {};
-    semaphoreInfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+    const VkSemaphoreCreateInfo semaphore_create_info = {
+        .sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO};
 
-    VkFenceCreateInfo fenceInfo = {};
-    fenceInfo.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+    const VkFenceCreateInfo fence_create_info = {
+        .sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO,
+        .flags = VK_FENCE_CREATE_SIGNALED_BIT,
+    };
 
     for (size_t i = 0; i < max_frames_in_flight; i++) {
-      if (vkCreateSemaphore(device_.device(), &semaphoreInfo, nullptr,
+      if (vkCreateSemaphore(device_.device(), &semaphore_create_info, nullptr,
                             &image_available_semaphores_[i]) != VK_SUCCESS ||
-          vkCreateSemaphore(device_.device(), &semaphoreInfo, nullptr,
+          vkCreateSemaphore(device_.device(), &semaphore_create_info, nullptr,
                             &render_finished_semaphores_[i]) != VK_SUCCESS ||
-          vkCreateFence(device_.device(), &fenceInfo, nullptr,
+          vkCreateFence(device_.device(), &fence_create_info, nullptr,
                         &in_flight_fences_[i]) != VK_SUCCESS) {
         beyond::panic("failed to create synchronization objects for a frame!");
       }
