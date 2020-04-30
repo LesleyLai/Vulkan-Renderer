@@ -4,6 +4,8 @@ add_library(vulkan_helper
         gpu_device.cpp
         shader_module.hpp
         shader_module.cpp
+        swapchain.hpp
+        swapchain.cpp
         unique_resource.hpp
         buffer.cpp buffer.hpp)
 target_link_libraries(vulkan_helper

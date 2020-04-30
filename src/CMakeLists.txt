@@ -4,8 +4,6 @@ add_subdirectory(vulkan_helper)
 
 add_executable(app
         main.cpp
-        swapchain.hpp
-        swapchain.cpp
         window.hpp
         window.cpp
 

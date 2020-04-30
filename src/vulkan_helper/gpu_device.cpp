@@ -101,12 +101,21 @@ GPUDevice::GPUDevice(Window& window,
   }
   compute_queue_ = graphics_queue_ret.value();
 
-  VmaAllocatorCreateInfo allocator_info{};
-  allocator_info.physicalDevice = physical_device_;
-  allocator_info.device = device_;
+  queue_family_indices_ = {
+      .graphics_family =
+          vkb_device.get_queue_index(vkb::QueueType::graphics).value(),
+      .present_family =
+          vkb_device.get_queue_index(vkb::QueueType::present).value(),
+      .compute_family =
+          vkb_device.get_queue_index(vkb::QueueType::compute).value()};
+
+  const VmaAllocatorCreateInfo allocator_info{
+      .physicalDevice = physical_device_,
+      .device = device_,
+  };
 
   if (vmaCreateAllocator(&allocator_info, &allocator_) != VK_SUCCESS) {
-    beyond::panic("Big bad");
+    beyond::panic("Cannot create vma allocator");
   }
 }
 

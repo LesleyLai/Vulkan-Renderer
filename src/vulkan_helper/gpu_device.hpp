@@ -1,6 +1,8 @@
 #ifndef VULKAN_HELPER_GPU_DEVICE_HPP
 #define VULKAN_HELPER_GPU_DEVICE_HPP
 
+#include <cstdint>
+
 #include <vulkan/vulkan.h>
 
 #include <VkBootstrap.h>
@@ -11,6 +13,12 @@ class Window;
 namespace vkh {
 
 enum ValidationLayerSetting { enable = 0, disable = 1 };
+
+struct QueueFamilyIndices {
+  std::uint32_t graphics_family;
+  std::uint32_t present_family;
+  std::uint32_t compute_family;
+};
 
 class GPUDevice {
   vkb::Instance instance_;
@@ -23,6 +31,8 @@ class GPUDevice {
   VkQueue graphics_queue_;
   VkQueue compute_queue_;
   VkQueue present_queue_;
+
+  QueueFamilyIndices queue_family_indices_;
 
   VmaAllocator allocator_{};
 
@@ -81,6 +91,12 @@ public:
   [[nodiscard]] auto msaa_sample_count() const noexcept -> VkSampleCountFlagBits
   {
     return msaa_sample_count_;
+  }
+
+  [[nodiscard]] auto queue_family_indices() const noexcept
+      -> const QueueFamilyIndices&
+  {
+    return queue_family_indices_;
   }
 
   auto wait_idle() const noexcept -> void;

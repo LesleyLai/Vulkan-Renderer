@@ -35,7 +35,7 @@ public:
   {
   }
 
-  auto operator=(UniqueBuffer&& other) noexcept -> UniqueBuffer&
+  auto operator=(UniqueBuffer&& other) & noexcept -> UniqueBuffer&
   {
     allocator_ = other.allocator_;
     buffer_ = std::exchange(other.buffer_, nullptr);

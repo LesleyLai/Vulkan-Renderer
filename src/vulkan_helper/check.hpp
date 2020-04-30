@@ -1,7 +1,7 @@
 #ifndef VULKAN_RENDERER_CHECK_HPP
 #define VULKAN_RENDERER_CHECK_HPP
 
-#include "panic.hpp"
+#include <beyond/utils/panic.hpp>
 
 #include <fmt/format.h>
 
@@ -9,8 +9,8 @@
   do {                                                                         \
     VkResult result = call;                                                    \
     if (result != VK_SUCCESS) {                                                \
-      ::vkh::panic(fmt::format("[{}:{}] Vulkan Fail at in {}\n", __FILE__,     \
-                               __LINE__, __func__));                           \
+      ::beyond::panic(fmt::format("[{}:{}] Vulkan Fail at in {}\n", __FILE__,  \
+                                  __LINE__, __func__));                        \
     }                                                                          \
   } while (0)
 
