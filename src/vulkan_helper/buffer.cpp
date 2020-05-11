@@ -5,7 +5,7 @@ namespace vkh {
 
 auto create_buffer(VmaAllocator allocator, VkDeviceSize size,
                    VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
-    -> beyond::expected<VmaCreateBufferResult, VkResult>
+    -> beyond::expected<VmaCreateBufferOutput, VkResult>
 {
   const VkBufferCreateInfo buffer_create_info = {
       .sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -25,7 +25,7 @@ auto create_buffer(VmaAllocator allocator, VkDeviceSize size,
       result != VK_SUCCESS) {
     return beyond::unexpected{result};
   } else {
-    return VmaCreateBufferResult{buffer, allocation};
+    return VmaCreateBufferOutput{buffer, allocation};
   }
 }
 
@@ -34,7 +34,7 @@ auto create_unique_buffer(VmaAllocator allocator, VkDeviceSize size,
     -> beyond::expected<UniqueBuffer, VkResult>
 {
   return create_buffer(allocator, size, usage, memory_usage)
-      .map([&allocator](VmaCreateBufferResult result) {
+      .map([&allocator](VmaCreateBufferOutput result) {
         return UniqueBuffer(allocator, result.buffer, result.allocation);
       });
 }

@@ -1,5 +1,5 @@
-#ifndef VULKAN_RENDERER_BUFFER_HPP
-#define VULKAN_RENDERER_BUFFER_HPP
+#ifndef VULKAN_HELPER_BUFFER_HPP
+#define VULKAN_HELPER_BUFFER_HPP
 
 #include <vulkan/vulkan_core.h>
 
@@ -76,7 +76,7 @@ public:
   }
 };
 
-struct VmaCreateBufferResult {
+struct VmaCreateBufferOutput {
   VkBuffer buffer = nullptr;
   VmaAllocation allocation = nullptr;
 
@@ -88,7 +88,7 @@ struct VmaCreateBufferResult {
 
 auto create_buffer(VmaAllocator allocator, VkDeviceSize size,
                    VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
-    -> beyond::expected<VmaCreateBufferResult, VkResult>;
+    -> beyond::expected<VmaCreateBufferOutput, VkResult>;
 
 auto create_unique_buffer(VmaAllocator allocator, VkDeviceSize size,
                           VkBufferUsageFlags usage, VmaMemoryUsage memory_usage)
@@ -99,4 +99,4 @@ void copy_buffer(GPUDevice& device, VkCommandPool command_pool, VkQueue queue,
 
 } // namespace vkh
 
-#endif // VULKAN_RENDERER_BUFFER_HPP
+#endif // VULKAN_HELPER_BUFFER_HPP

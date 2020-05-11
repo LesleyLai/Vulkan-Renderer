@@ -5,8 +5,6 @@
 
 #include <VkBootstrap.h>
 
-#include <algorithm>
-#include <limits>
 #include <vector>
 
 namespace vkh {
@@ -19,6 +17,10 @@ Swapchain::Swapchain(const GPUDevice& device) : device_{device.device()}
       device.queue_family_indices().present_family};
 
   auto swap_ret = swapchain_builder.use_default_format_selection()
+                      .set_desired_format(VkSurfaceFormatKHR{
+                          .format = VK_FORMAT_B8G8R8A8_SRGB,
+                          .colorSpace = VK_COLOR_SPACE_SRGB_NONLINEAR_KHR,
+                      })
                       .use_default_present_mode_selection()
                       .build();
 

@@ -11,16 +11,6 @@
 
 namespace vkh {
 
-struct SwapchainSupportDetails {
-  VkSurfaceCapabilitiesKHR capabilities;
-  std::vector<VkSurfaceFormatKHR> formats;
-  std::vector<VkPresentModeKHR> present_modes;
-};
-
-[[nodiscard]] auto query_swapchain_support(VkPhysicalDevice device,
-                                           VkSurfaceKHR surface) noexcept
-    -> SwapchainSupportDetails;
-
 class GPUDevice;
 
 class Swapchain {
