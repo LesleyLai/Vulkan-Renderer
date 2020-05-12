@@ -13,9 +13,11 @@
 
 #include "vulkan_helper/buffer.hpp"
 
+#include <gsl/span>
+
 struct Vertex {
   glm::vec3 pos;
-  glm::vec3 color;
+  glm::vec3 normal;
   glm::vec2 tex_coord;
 
   [[nodiscard]] static constexpr auto get_binding_description() noexcept
@@ -41,7 +43,7 @@ struct Vertex {
                 .location = 1,
                 .binding = 0,
                 .format = VK_FORMAT_R32G32B32_SFLOAT,
-                .offset = offsetof(Vertex, color),
+                .offset = offsetof(Vertex, normal),
             },
             VkVertexInputAttributeDescription{
                 .location = 2,
@@ -53,7 +55,7 @@ struct Vertex {
 
   [[nodiscard]] auto operator==(const Vertex& other) const noexcept -> bool
   {
-    return pos == other.pos && color == other.color &&
+    return pos == other.pos && normal == other.normal &&
            tex_coord == other.tex_coord;
   }
 };
@@ -64,7 +66,14 @@ struct StaticMesh {
   std::uint32_t indices_size;
 };
 
-[[nodiscard]] auto load_mesh(vkh::GPUDevice& device, VkCommandPool command_pool,
-                             VkQueue queue, const char* path) -> StaticMesh;
+[[nodiscard]] auto create_mesh_from_file(vkh::GPUDevice& device,
+                                         VkCommandPool command_pool,
+                                         VkQueue queue, const char* path)
+    -> StaticMesh;
+
+[[nodiscard]] auto
+create_mesh_from_data(vkh::GPUDevice& device, VkCommandPool command_pool,
+                      VkQueue queue, gsl::span<Vertex> vertices,
+                      gsl::span<uint32_t> indices) -> StaticMesh;
 
 #endif // VULKAN_RENDERER_MESH_HPP

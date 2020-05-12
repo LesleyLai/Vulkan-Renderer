@@ -10,7 +10,7 @@ template <> struct hash<Vertex> {
   [[nodiscard]] auto operator()(Vertex const& vertex) const noexcept -> size_t
   {
     return ((hash<glm::vec3>()(vertex.pos) ^
-             (hash<glm::vec3>()(vertex.color) << 1u)) >>
+             (hash<glm::vec3>()(vertex.normal) << 1u)) >>
             1u) ^
            (hash<glm::vec2>()(vertex.tex_coord) << 1u);
   }
@@ -19,10 +19,11 @@ template <> struct hash<Vertex> {
 
 namespace {
 auto create_vertex_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
-                          VkQueue queue, const std::vector<Vertex>& vertices)
+                          VkQueue queue, gsl::span<Vertex> vertices)
     -> vkh::UniqueBuffer
 {
-  VkDeviceSize buffer_size = sizeof(vertices[0]) * vertices.size();
+  VkDeviceSize buffer_size =
+      sizeof(vertices[0]) * static_cast<VkDeviceSize>(vertices.size());
 
   auto staging_buffer =
       vkh::create_unique_buffer(device.allocator(), buffer_size,
@@ -49,10 +50,11 @@ auto create_vertex_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
 }
 
 auto create_index_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
-                         VkQueue queue, const std::vector<uint32_t>& indices)
+                         VkQueue queue, gsl::span<uint32_t> indices)
     -> vkh::UniqueBuffer
 {
-  VkDeviceSize buffer_size = sizeof(indices[0]) * indices.size();
+  VkDeviceSize buffer_size =
+      sizeof(indices[0]) * static_cast<VkDeviceSize>(indices.size());
 
   auto staging_buffer =
       vkh::create_unique_buffer(device.allocator(), buffer_size,
@@ -79,8 +81,10 @@ auto create_index_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
 }
 } // namespace
 
-[[nodiscard]] auto load_mesh(vkh::GPUDevice& device, VkCommandPool command_pool,
-                             VkQueue queue, const char* path) -> StaticMesh
+[[nodiscard]] auto create_mesh_from_file(vkh::GPUDevice& device,
+                                         VkCommandPool command_pool,
+                                         VkQueue queue, const char* path)
+    -> StaticMesh
 {
   tinyobj::attrib_t attrib;
   std::vector<tinyobj::shape_t> shapes;
@@ -104,7 +108,7 @@ auto create_index_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
                attrib.vertices[static_cast<size_t>(3 * index.vertex_index + 1)],
                attrib
                    .vertices[static_cast<size_t>(3 * index.vertex_index + 2)]},
-          .color = {1.0f, 1.0f, 1.0f},
+          .normal = {1.0f, 1.0f, 1.0f},
           .tex_coord = {attrib.texcoords[static_cast<size_t>(
                             2 * index.texcoord_index + 0)],
                         1.0f - attrib.texcoords[static_cast<size_t>(
@@ -120,6 +124,14 @@ auto create_index_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
     }
   }
 
+  return create_mesh_from_data(device, command_pool, queue, vertices, indices);
+}
+
+[[nodiscard]] auto
+create_mesh_from_data(vkh::GPUDevice& device, VkCommandPool command_pool,
+                      VkQueue queue, gsl::span<Vertex> vertices,
+                      gsl::span<uint32_t> indices) -> StaticMesh
+{
   return StaticMesh{
       .vertex_buffer =
           create_vertex_buffer(device, command_pool, queue, vertices),

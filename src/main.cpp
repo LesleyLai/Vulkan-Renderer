@@ -54,6 +54,63 @@ struct UniformBufferObject {
   glm::mat4 proj;
 };
 
+auto generate_uv_sphere(vkh::GPUDevice& device, VkCommandPool command_pool,
+                        VkQueue queue) -> StaticMesh
+{
+  std::vector<Vertex> vertices;
+  std::vector<uint32_t> indices;
+
+  constexpr uint32_t lat_segments_count = 32;
+  constexpr uint32_t lon_segments_count = 32;
+  constexpr auto pi = glm::pi<float>();
+  for (unsigned int y = 0; y <= lon_segments_count; ++y) {
+    const auto y_segment =
+        static_cast<float>(y) / static_cast<float>(lon_segments_count);
+    const auto theta = y_segment * pi;
+
+    for (unsigned int x = 0; x <= lat_segments_count; ++x) {
+      const auto x_segment =
+          static_cast<float>(x) / static_cast<float>(lat_segments_count);
+
+      const auto phi = x_segment * 2.0f * pi;
+
+      const float x_pos = std::cos(phi) * std::sin(theta);
+      const float y_pos = std::sin(phi) * std::sin(theta);
+      const float z_pos = std::cos(theta);
+
+      vertices.push_back({
+          .pos = glm::vec3(x_pos, y_pos, z_pos),
+          .normal = glm::vec3(x_pos, y_pos, z_pos),
+          .tex_coord = glm::vec2(x_segment, y_segment),
+      });
+    }
+  }
+
+  for (uint32_t y = 0; y < lon_segments_count; ++y) {
+    for (uint32_t x = 0; x < lat_segments_count; ++x) {}
+  }
+
+  bool odd_row = false;
+  for (unsigned int y = 0; y < lat_segments_count; ++y) {
+    if (!odd_row) // even rows: y == 0, y == 2; and so on
+    {
+      for (unsigned int x = 0; x <= lon_segments_count; ++x) {
+        indices.push_back(y * (lon_segments_count + 1) + x);
+        indices.push_back((y + 1) * (lon_segments_count + 1) + x);
+      }
+    } else {
+      for (int x = lon_segments_count; x >= 0; --x) {
+        const auto ux = static_cast<uint32_t>(x);
+        indices.push_back((y + 1) * (lon_segments_count + 1) + ux);
+        indices.push_back(y * (lon_segments_count + 1) + ux);
+      }
+    }
+    odd_row = !odd_row;
+  }
+
+  return create_mesh_from_data(device, command_pool, queue, vertices, indices);
+}
+
 class Application {
 public:
   Application() : window_{init_width, init_height, "Vulkan"}, device_{window_}
@@ -99,16 +156,16 @@ private:
   VkCommandPool graphics_command_pool_{};
 
   VkImage color_image_{};
-  VkDeviceMemory color_image_memory_{};
+  VmaAllocation color_image_memory_{};
   VkImageView color_image_view_{};
 
   VkImage depth_image_{};
-  VkDeviceMemory depth_image_memory_{};
+  VmaAllocation depth_image_memory_{};
   VkImageView depth_image_view_{};
 
   uint32_t mip_levels_{};
   VkImage texture_image_{};
-  VkDeviceMemory texture_image_memory_{};
+  VmaAllocation texture_image_memory_{};
   VkImageView texture_image_view_{};
   VkSampler texture_sampler_{};
 
@@ -186,8 +243,9 @@ private:
     create_texture_image();
     create_texture_image_view();
     create_texture_sampler();
-    mesh_ = load_mesh(device_, graphics_command_pool_, device_.graphics_queue(),
-                      model_path);
+
+    mesh_ = generate_uv_sphere(device_, graphics_command_pool_,
+                               device_.graphics_queue());
     create_uniform_buffers();
     create_descriptor_pool();
     create_descriptor_sets();
@@ -198,16 +256,16 @@ private:
   void cleanup_swapchain()
   {
     vkDestroyImageView(device_.device(), depth_image_view_, nullptr);
-    vkDestroyImage(device_.device(), depth_image_, nullptr);
-    vkFreeMemory(device_.device(), depth_image_memory_, nullptr);
+    vmaDestroyImage(device_.allocator(), depth_image_, depth_image_memory_);
 
     vkDestroyImageView(device_.device(), color_image_view_, nullptr);
-    vkDestroyImage(device_.device(), color_image_, nullptr);
-    vkFreeMemory(device_.device(), color_image_memory_, nullptr);
+    vmaDestroyImage(device_.allocator(), color_image_, color_image_memory_);
 
     for (auto* framebuffer : swapchain_framebuffers_) {
       vkDestroyFramebuffer(device_.device(), framebuffer, nullptr);
     }
+
+    swapchain_.reset();
 
     vkFreeCommandBuffers(device_.device(), graphics_command_pool_,
                          static_cast<uint32_t>(command_buffers_.size()),
@@ -216,8 +274,6 @@ private:
     vkDestroyPipeline(device_.device(), graphics_pipeline_, nullptr);
     vkDestroyPipelineLayout(device_.device(), pipeline_layout_, nullptr);
     vkDestroyRenderPass(device_.device(), render_pass_, nullptr);
-
-    swapchain_.reset();
 
     for (size_t i = 0; i < swapchain_.images().size(); i++) {
       uniform_buffers_[i].reset();
@@ -233,8 +289,7 @@ private:
     vkDestroySampler(device_.device(), texture_sampler_, nullptr);
     vkDestroyImageView(device_.device(), texture_image_view_, nullptr);
 
-    vkDestroyImage(device_.device(), texture_image_, nullptr);
-    vkFreeMemory(device_.device(), texture_image_memory_, nullptr);
+    vmaDestroyImage(device_.allocator(), texture_image_, texture_image_memory_);
 
     vkDestroyDescriptorSetLayout(device_.device(), descriptor_set_layout_,
                                  nullptr);
@@ -267,6 +322,7 @@ private:
     cleanup_swapchain();
 
     swapchain_ = vkh::Swapchain(device_);
+
     create_render_pass();
     create_graphics_pipeline();
     create_color_resources();
@@ -437,7 +493,7 @@ private:
 
     const VkPipelineInputAssemblyStateCreateInfo input_assembly = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
         .primitiveRestartEnable = VK_FALSE};
 
     const VkViewport viewport = {
@@ -574,12 +630,12 @@ private:
   {
     VkFormat color_format = swapchain_.image_format();
 
-    create_image(
-        swapchain_.extent().width, swapchain_.extent().height, 1,
-        device_.msaa_sample_count(), color_format, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
-            VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, color_image_, color_image_memory_);
+    create_image(swapchain_.extent().width, swapchain_.extent().height, 1,
+                 device_.msaa_sample_count(), color_format,
+                 VK_IMAGE_TILING_OPTIMAL,
+                 VK_IMAGE_USAGE_TRANSIENT_ATTACHMENT_BIT |
+                     VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+                 color_image_, color_image_memory_);
     color_image_view_ = create_image_view(color_image_, color_format,
                                           VK_IMAGE_ASPECT_COLOR_BIT, 1);
   }
@@ -587,11 +643,11 @@ private:
   void create_depth_resources()
   {
     const VkFormat depth_format = find_depth_format();
-    create_image(
-        swapchain_.extent().width, swapchain_.extent().height, 1,
-        device_.msaa_sample_count(), depth_format, VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, depth_image_, depth_image_memory_);
+    create_image(swapchain_.extent().width, swapchain_.extent().height, 1,
+                 device_.msaa_sample_count(), depth_format,
+                 VK_IMAGE_TILING_OPTIMAL,
+                 VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, depth_image_,
+                 depth_image_memory_);
     depth_image_view_ = create_image_view(depth_image_, depth_format,
                                           VK_IMAGE_ASPECT_DEPTH_BIT, 1);
   }
@@ -657,8 +713,7 @@ private:
         VK_IMAGE_TILING_OPTIMAL,
         VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
             VK_IMAGE_USAGE_SAMPLED_BIT,
-        VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT, texture_image_,
-        texture_image_memory_);
+        texture_image_, texture_image_memory_);
 
     transition_image_layout(texture_image_, VK_FORMAT_R8G8B8A8_SRGB,
                             VK_IMAGE_LAYOUT_UNDEFINED,
@@ -819,8 +874,7 @@ private:
   void create_image(uint32_t width, uint32_t height, uint32_t mipLevels,
                     VkSampleCountFlagBits numSamples, VkFormat format,
                     VkImageTiling tiling, VkImageUsageFlags usage,
-                    VkMemoryPropertyFlags properties, VkImage& image,
-                    VkDeviceMemory& imageMemory)
+                    VkImage& image, VmaAllocation& imageMemory)
   {
     VkImageCreateInfo imageInfo = {};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -837,21 +891,9 @@ private:
     imageInfo.samples = numSamples;
     imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 
-    VKH_CHECK(vkCreateImage(device_.device(), &imageInfo, nullptr, &image));
-
-    VkMemoryRequirements memRequirements;
-    vkGetImageMemoryRequirements(device_.device(), image, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-    allocInfo.memoryTypeIndex =
-        find_memory_type(memRequirements.memoryTypeBits, properties);
-
-    VKH_CHECK(
-        vkAllocateMemory(device_.device(), &allocInfo, nullptr, &imageMemory));
-
-    vkBindImageMemory(device_.device(), image, imageMemory, 0);
+    VmaAllocationCreateInfo alloc_info{.usage = VMA_MEMORY_USAGE_GPU_ONLY};
+    VKH_CHECK(vmaCreateImage(device_.allocator(), &imageInfo, &alloc_info,
+                             &image, &imageMemory, nullptr));
   }
 
   void transition_image_layout(VkImage image, VkFormat /*format*/,
