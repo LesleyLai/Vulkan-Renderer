@@ -29,7 +29,7 @@ auto create_image(VmaAllocator allocator, const ImageCreateInfo& create_info,
   if (VkResult result = vmaCreateImage(allocator, &vk_image_create_info,
                                        &allocation_create_info, &output.image,
                                        &output.allocation, nullptr);
-      !result) {
+      result != VK_SUCCESS) {
     return beyond::unexpected{result};
   } else {
     return output;

@@ -37,9 +37,11 @@ public:
 
   auto operator=(UniqueImage&& other) & noexcept -> UniqueImage&
   {
-    allocator_ = other.allocator_;
-    image_ = std::exchange(other.image_, nullptr);
-    allocation_ = std::exchange(other.allocation_, nullptr);
+    if (this != &other) {
+      allocator_ = other.allocator_;
+      image_ = std::exchange(other.image_, nullptr);
+      allocation_ = std::exchange(other.allocation_, nullptr);
+    }
     return *this;
   }
 

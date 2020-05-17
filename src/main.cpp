@@ -19,6 +19,8 @@
 #include "vulkan_helper/single_time_command.hpp"
 #include "vulkan_helper/swapchain.hpp"
 
+#include "vulkan_helper/image.hpp"
+
 #include "window.hpp"
 
 #include <beyond/math/angle.hpp>
@@ -165,8 +167,8 @@ private:
   VkImageView depth_image_view_{};
 
   uint32_t mip_levels_{};
-  VkImage texture_image_{};
-  VmaAllocation texture_image_memory_{};
+
+  vkh::UniqueImage texture_image_{};
   VkImageView texture_image_view_{};
   VkSampler texture_sampler_{};
 
@@ -290,7 +292,10 @@ private:
     vkDestroySampler(device_.device(), texture_sampler_, nullptr);
     vkDestroyImageView(device_.device(), texture_image_view_, nullptr);
 
-    vmaDestroyImage(device_.allocator(), texture_image_, texture_image_memory_);
+    texture_image_.reset();
+
+    // vmaDestroyImage(device_.allocator(), texture_image_,
+    // texture_image_memory_);
 
     vkDestroyDescriptorSetLayout(device_.device(), descriptor_set_layout_,
                                  nullptr);
@@ -708,24 +713,42 @@ private:
 
     stbi_image_free(pixels);
 
-    create_image(
-        static_cast<uint32_t>(tex_width), static_cast<uint32_t>(tex_height),
-        mip_levels_, VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB,
-        VK_IMAGE_TILING_OPTIMAL,
-        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT |
-            VK_IMAGE_USAGE_SAMPLED_BIT,
-        texture_image_, texture_image_memory_);
+    auto texture_image_res = vkh::create_unique_image(
+        device_.allocator(),
+        vkh::ImageCreateInfo{
+            .extent = {static_cast<uint32_t>(tex_width),
+                       static_cast<uint32_t>(tex_height), 1},
+            .mip_levels = mip_levels_,
+            .samples_count = VK_SAMPLE_COUNT_1_BIT,
+            .format = VK_FORMAT_R8G8B8A8_SRGB,
+            .tiling = VK_IMAGE_TILING_OPTIMAL,
+            .usage = VK_IMAGE_USAGE_TRANSFER_SRC_BIT |
+                     VK_IMAGE_USAGE_TRANSFER_DST_BIT |
+                     VK_IMAGE_USAGE_SAMPLED_BIT,
+        },
+        VMA_MEMORY_USAGE_GPU_ONLY);
+    texture_image_ = std::move(texture_image_res).value();
 
-    transition_image_layout(texture_image_, VK_FORMAT_R8G8B8A8_SRGB,
+    //    create_image(
+    //        static_cast<uint32_t>(tex_width),
+    //        static_cast<uint32_t>(tex_height), mip_levels_,
+    //        VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB,
+    //        VK_IMAGE_TILING_OPTIMAL,
+    //        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
+    //        |
+    //            VK_IMAGE_USAGE_SAMPLED_BIT,
+    //        texture_image_, texture_image_memory_);
+
+    transition_image_layout(texture_image_.get(), VK_FORMAT_R8G8B8A8_SRGB,
                             VK_IMAGE_LAYOUT_UNDEFINED,
                             VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip_levels_);
-    copy_buffer_to_image(staging_buffer, texture_image_,
+    copy_buffer_to_image(staging_buffer, texture_image_.get(),
                          static_cast<uint32_t>(tex_width),
                          static_cast<uint32_t>(tex_height));
     // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating
     // mipmaps
 
-    generate_mipmaps(texture_image_, VK_FORMAT_R8G8B8A8_SRGB, tex_width,
+    generate_mipmaps(texture_image_.get(), VK_FORMAT_R8G8B8A8_SRGB, tex_width,
                      tex_height, mip_levels_);
   }
 
@@ -822,7 +845,7 @@ private:
   void create_texture_image_view()
   {
     texture_image_view_ =
-        create_image_view(texture_image_, VK_FORMAT_R8G8B8A8_SRGB,
+        create_image_view(texture_image_.get(), VK_FORMAT_R8G8B8A8_SRGB,
                           VK_IMAGE_ASPECT_COLOR_BIT, mip_levels_);
   }
 
