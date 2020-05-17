@@ -11,10 +11,8 @@ namespace vkh {
 
 Swapchain::Swapchain(const GPUDevice& device) : device_{device.device()}
 {
-  vkb::SwapchainBuilder swapchain_builder{
-      device.vk_physical_device(), device.device(), device.surface(),
-      device.queue_family_indices().graphics_family,
-      device.queue_family_indices().present_family};
+  vkb::SwapchainBuilder swapchain_builder{device.vk_physical_device(),
+                                          device.device(), device.surface()};
 
   auto swap_ret = swapchain_builder.use_default_format_selection()
                       .set_desired_format(VkSurfaceFormatKHR{
@@ -28,8 +26,8 @@ Swapchain::Swapchain(const GPUDevice& device) : device_{device.device()}
 
   swapchain_ = swap_ret->swapchain;
   images_count_ = swap_ret->image_count;
-  images_ = vkb::get_swapchain_images(*swap_ret).value();
-  image_views_ = vkb::get_swapchain_image_views(*swap_ret, images_).value();
+  images_ = swap_ret->get_images().value();
+  image_views_ = swap_ret->get_image_views().value();
   images_format_ = swap_ret->image_format;
   extent_ = swap_ret->extent;
 }

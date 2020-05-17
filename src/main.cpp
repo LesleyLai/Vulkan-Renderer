@@ -44,7 +44,8 @@ constexpr int init_width = 800;
 constexpr int init_height = 600;
 
 constexpr const char* model_path = "models/chalet.obj";
-constexpr const char* texture_path = "textures/chalet.jpg";
+constexpr const char* texture_path =
+    "textures/rustediron1-alt2-bl/rustediron2_basecolor.png";
 
 constexpr int max_frames_in_flight = 2;
 
@@ -60,17 +61,17 @@ auto generate_uv_sphere(vkh::GPUDevice& device, VkCommandPool command_pool,
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
 
-  constexpr uint32_t lat_segments_count = 32;
-  constexpr uint32_t lon_segments_count = 32;
+  constexpr uint32_t x_segments_count = 32;
+  constexpr uint32_t y_segments_count = 32;
   constexpr auto pi = glm::pi<float>();
-  for (unsigned int y = 0; y <= lon_segments_count; ++y) {
+  for (unsigned int y = 0; y <= y_segments_count; ++y) {
     const auto y_segment =
-        static_cast<float>(y) / static_cast<float>(lon_segments_count);
+        static_cast<float>(y) / static_cast<float>(y_segments_count);
     const auto theta = y_segment * pi;
 
-    for (unsigned int x = 0; x <= lat_segments_count; ++x) {
+    for (unsigned int x = 0; x <= x_segments_count; ++x) {
       const auto x_segment =
-          static_cast<float>(x) / static_cast<float>(lat_segments_count);
+          static_cast<float>(x) / static_cast<float>(x_segments_count);
 
       const auto phi = x_segment * 2.0f * pi;
 
@@ -86,23 +87,23 @@ auto generate_uv_sphere(vkh::GPUDevice& device, VkCommandPool command_pool,
     }
   }
 
-  for (uint32_t y = 0; y < lon_segments_count; ++y) {
-    for (uint32_t x = 0; x < lat_segments_count; ++x) {}
+  for (uint32_t y = 0; y < y_segments_count; ++y) {
+    for (uint32_t x = 0; x < x_segments_count; ++x) {}
   }
 
   bool odd_row = false;
-  for (unsigned int y = 0; y < lat_segments_count; ++y) {
+  for (unsigned int y = 0; y < x_segments_count; ++y) {
     if (!odd_row) // even rows: y == 0, y == 2; and so on
     {
-      for (unsigned int x = 0; x <= lon_segments_count; ++x) {
-        indices.push_back(y * (lon_segments_count + 1) + x);
-        indices.push_back((y + 1) * (lon_segments_count + 1) + x);
+      for (unsigned int x = 0; x <= y_segments_count; ++x) {
+        indices.push_back(y * (y_segments_count + 1) + x);
+        indices.push_back((y + 1) * (y_segments_count + 1) + x);
       }
     } else {
-      for (int x = lon_segments_count; x >= 0; --x) {
+      for (int x = y_segments_count; x >= 0; --x) {
         const auto ux = static_cast<uint32_t>(x);
-        indices.push_back((y + 1) * (lon_segments_count + 1) + ux);
-        indices.push_back(y * (lon_segments_count + 1) + ux);
+        indices.push_back((y + 1) * (y_segments_count + 1) + ux);
+        indices.push_back(y * (y_segments_count + 1) + ux);
       }
     }
     odd_row = !odd_row;
