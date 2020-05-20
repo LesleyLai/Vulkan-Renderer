@@ -55,11 +55,6 @@ public:
     vmaDestroyBuffer(allocator_, buffer_, allocation_);
   }
 
-  [[nodiscard]] /*implicit*/ operator VkBuffer() const noexcept
-  {
-    return buffer_;
-  }
-
   [[nodiscard]] auto get() const noexcept -> VkBuffer
   {
     return buffer_;

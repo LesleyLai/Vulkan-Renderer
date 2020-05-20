@@ -46,8 +46,6 @@ constexpr int init_width = 800;
 constexpr int init_height = 600;
 
 constexpr const char* model_path = "models/chalet.obj";
-constexpr const char* texture_path =
-    "textures/rustediron1-alt2-bl/rustediron2_basecolor.png";
 
 constexpr int max_frames_in_flight = 2;
 
@@ -114,6 +112,13 @@ auto generate_uv_sphere(vkh::GPUDevice& device, VkCommandPool command_pool,
   return create_mesh_from_data(device, command_pool, queue, vertices, indices);
 }
 
+struct Texture {
+  uint32_t mip_levels{};
+  vkh::UniqueImage image{};
+  VkImageView image_view{};
+  VkSampler sampler{};
+};
+
 class Application {
 public:
   Application() : window_{init_width, init_height, "Vulkan"}, device_{window_}
@@ -166,11 +171,10 @@ private:
   VmaAllocation depth_image_memory_{};
   VkImageView depth_image_view_{};
 
-  uint32_t mip_levels_{};
-
-  vkh::UniqueImage texture_image_{};
-  VkImageView texture_image_view_{};
-  VkSampler texture_sampler_{};
+  Texture albedo_texture_{};
+  Texture normal_texture_{};
+  Texture metallic_texture_{};
+  Texture roughness_texture_{};
 
   StaticMesh mesh_;
   std::vector<vkh::UniqueBuffer> uniform_buffers_;
@@ -243,9 +247,14 @@ private:
     create_color_resources();
     create_depth_resources();
     create_framebuffers();
-    create_texture_image();
-    create_texture_image_view();
-    create_texture_sampler();
+    albedo_texture_ = create_texture_image(
+        "textures/rustediron1-alt2-bl/rustediron2_basecolor.png");
+    normal_texture_ = create_texture_image(
+        "textures/rustediron1-alt2-bl/rustediron2_normal.png");
+    metallic_texture_ = create_texture_image(
+        "textures/rustediron1-alt2-bl/rustediron2_metallic.png");
+    roughness_texture_ = create_texture_image(
+        "textures/rustediron1-alt2-bl/rustediron2_roughness.png");
 
     mesh_ = generate_uv_sphere(device_, graphics_command_pool_,
                                device_.graphics_queue());
@@ -289,13 +298,16 @@ private:
   {
     cleanup_swapchain();
 
-    vkDestroySampler(device_.device(), texture_sampler_, nullptr);
-    vkDestroyImageView(device_.device(), texture_image_view_, nullptr);
+    auto destroy_texture = [device = device_.device()](Texture& texture) {
+      vkDestroySampler(device, texture.sampler, nullptr);
+      vkDestroyImageView(device, texture.image_view, nullptr);
+      texture.image.reset();
+    };
 
-    texture_image_.reset();
-
-    // vmaDestroyImage(device_.allocator(), texture_image_,
-    // texture_image_memory_);
+    destroy_texture(roughness_texture_);
+    destroy_texture(metallic_texture_);
+    destroy_texture(normal_texture_);
+    destroy_texture(albedo_texture_);
 
     vkDestroyDescriptorSetLayout(device_.device(), descriptor_set_layout_,
                                  nullptr);
@@ -436,7 +448,7 @@ private:
         .pImmutableSamplers = nullptr,
     };
 
-    const VkDescriptorSetLayoutBinding sampler_layout_binding = {
+    const VkDescriptorSetLayoutBinding albedo_sampler_layout_binding = {
         .binding = 1,
         .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
         .descriptorCount = 1,
@@ -444,7 +456,34 @@ private:
         .pImmutableSamplers = nullptr,
     };
 
-    const std::array bindings = {ubo_layout_binding, sampler_layout_binding};
+    const VkDescriptorSetLayoutBinding normal_sampler_layout_binding = {
+        .binding = 2,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
+    const VkDescriptorSetLayoutBinding metallic_sampler_layout_binding = {
+        .binding = 3,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
+    const VkDescriptorSetLayoutBinding roughness_sampler_layout_binding = {
+        .binding = 4,
+        .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+        .descriptorCount = 1,
+        .stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
+        .pImmutableSamplers = nullptr,
+    };
+
+    const std::array bindings = {
+        ubo_layout_binding, albedo_sampler_layout_binding,
+        normal_sampler_layout_binding, metallic_sampler_layout_binding,
+        roughness_sampler_layout_binding};
 
     const VkDescriptorSetLayoutCreateInfo layout_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
@@ -687,18 +726,24 @@ private:
         VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT);
   }
 
-  void create_texture_image()
+  [[nodiscard]] auto create_texture_image(const char* texture_path) -> Texture
   {
+    Texture texture;
+
     int tex_width, tex_height, tex_channels;
+
     stbi_uc* pixels = stbi_load(texture_path, &tex_width, &tex_height,
                                 &tex_channels, STBI_rgb_alpha);
     const auto image_size =
         static_cast<VkDeviceSize>(tex_width * tex_height * 4);
-    mip_levels_ = static_cast<uint32_t>(
-                      std::floor(std::log2(std::max(tex_width, tex_height)))) +
-                  1;
+    texture.mip_levels = static_cast<uint32_t>(std::floor(
+                             std::log2(std::max(tex_width, tex_height)))) +
+                         1;
 
-    if (!pixels) { beyond::panic("failed to load texture image!"); }
+    if (!pixels) {
+      beyond::panic(
+          fmt::format("failed to load texture image at {}!", texture_path));
+    }
 
     auto staging_buffer =
         vkh::create_unique_buffer(device_.allocator(), image_size,
@@ -718,7 +763,7 @@ private:
         vkh::ImageCreateInfo{
             .extent = {static_cast<uint32_t>(tex_width),
                        static_cast<uint32_t>(tex_height), 1},
-            .mip_levels = mip_levels_,
+            .mip_levels = texture.mip_levels,
             .samples_count = VK_SAMPLE_COUNT_1_BIT,
             .format = VK_FORMAT_R8G8B8A8_SRGB,
             .tiling = VK_IMAGE_TILING_OPTIMAL,
@@ -727,29 +772,47 @@ private:
                      VK_IMAGE_USAGE_SAMPLED_BIT,
         },
         VMA_MEMORY_USAGE_GPU_ONLY);
-    texture_image_ = std::move(texture_image_res).value();
+    texture.image = std::move(texture_image_res).value();
 
-    //    create_image(
-    //        static_cast<uint32_t>(tex_width),
-    //        static_cast<uint32_t>(tex_height), mip_levels_,
-    //        VK_SAMPLE_COUNT_1_BIT, VK_FORMAT_R8G8B8A8_SRGB,
-    //        VK_IMAGE_TILING_OPTIMAL,
-    //        VK_IMAGE_USAGE_TRANSFER_SRC_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT
-    //        |
-    //            VK_IMAGE_USAGE_SAMPLED_BIT,
-    //        texture_image_, texture_image_memory_);
-
-    transition_image_layout(texture_image_.get(), VK_FORMAT_R8G8B8A8_SRGB,
-                            VK_IMAGE_LAYOUT_UNDEFINED,
-                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, mip_levels_);
-    copy_buffer_to_image(staging_buffer, texture_image_.get(),
+    transition_image_layout(
+        texture.image.get(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
+    copy_buffer_to_image(staging_buffer.get(), texture.image.get(),
                          static_cast<uint32_t>(tex_width),
                          static_cast<uint32_t>(tex_height));
     // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating
     // mipmaps
 
-    generate_mipmaps(texture_image_.get(), VK_FORMAT_R8G8B8A8_SRGB, tex_width,
-                     tex_height, mip_levels_);
+    generate_mipmaps(texture.image.get(), VK_FORMAT_R8G8B8A8_SRGB, tex_width,
+                     tex_height, texture.mip_levels);
+
+    texture.image_view =
+        create_image_view(texture.image.get(), VK_FORMAT_R8G8B8A8_SRGB,
+                          VK_IMAGE_ASPECT_COLOR_BIT, texture.mip_levels);
+
+    const VkSamplerCreateInfo sampler_create_info = {
+        .sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO,
+        .magFilter = VK_FILTER_LINEAR,
+        .minFilter = VK_FILTER_LINEAR,
+        .mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+        .addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT,
+        .mipLodBias = 0,
+        .anisotropyEnable = VK_TRUE,
+        .maxAnisotropy = 16,
+        .compareEnable = VK_FALSE,
+        .compareOp = VK_COMPARE_OP_ALWAYS,
+        .minLod = 0,
+        .maxLod = static_cast<float>(texture.mip_levels),
+        .borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK,
+        .unnormalizedCoordinates = VK_FALSE,
+    };
+
+    VKH_CHECK(vkCreateSampler(device_.device(), &sampler_create_info, nullptr,
+                              &texture.sampler));
+
+    return texture;
   }
 
   void generate_mipmaps(VkImage image, VkFormat imageFormat, int32_t tex_width,
@@ -842,55 +905,26 @@ private:
         });
   }
 
-  void create_texture_image_view()
-  {
-    texture_image_view_ =
-        create_image_view(texture_image_.get(), VK_FORMAT_R8G8B8A8_SRGB,
-                          VK_IMAGE_ASPECT_COLOR_BIT, mip_levels_);
-  }
-
-  void create_texture_sampler()
-  {
-    VkSamplerCreateInfo samplerInfo = {};
-    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
-    samplerInfo.magFilter = VK_FILTER_LINEAR;
-    samplerInfo.minFilter = VK_FILTER_LINEAR;
-    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-    samplerInfo.anisotropyEnable = VK_TRUE;
-    samplerInfo.maxAnisotropy = 16;
-    samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-    samplerInfo.unnormalizedCoordinates = VK_FALSE;
-    samplerInfo.compareEnable = VK_FALSE;
-    samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-    samplerInfo.minLod = 0;
-    samplerInfo.maxLod = static_cast<float>(mip_levels_);
-    samplerInfo.mipLodBias = 0;
-
-    VKH_CHECK(vkCreateSampler(device_.device(), &samplerInfo, nullptr,
-                              &texture_sampler_));
-  }
-
   VkImageView create_image_view(VkImage image, VkFormat format,
                                 VkImageAspectFlags aspectFlags,
                                 uint32_t mipLevels)
   {
-    VkImageViewCreateInfo viewInfo = {};
-    viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-    viewInfo.image = image;
-    viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
-    viewInfo.format = format;
-    viewInfo.subresourceRange.aspectMask = aspectFlags;
-    viewInfo.subresourceRange.baseMipLevel = 0;
-    viewInfo.subresourceRange.levelCount = mipLevels;
-    viewInfo.subresourceRange.baseArrayLayer = 0;
-    viewInfo.subresourceRange.layerCount = 1;
+    const VkImageViewCreateInfo create_info = {
+        .sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+        .image = image,
+        .viewType = VK_IMAGE_VIEW_TYPE_2D,
+        .format = format,
+        .subresourceRange = {
+            .aspectMask = aspectFlags,
+            .baseMipLevel = 0,
+            .levelCount = mipLevels,
+            .baseArrayLayer = 0,
+            .layerCount = 1,
+        }};
 
     VkImageView image_view;
-    VKH_CHECK(
-        vkCreateImageView(device_.device(), &viewInfo, nullptr, &image_view));
+    VKH_CHECK(vkCreateImageView(device_.device(), &create_info, nullptr,
+                                &image_view));
 
     return image_view;
   }
@@ -1012,7 +1046,7 @@ private:
 
   void create_descriptor_pool()
   {
-    const std::array poolSizes = {
+    const std::array pool_sizes = {
         VkDescriptorPoolSize{
             .type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
             .descriptorCount =
@@ -1021,14 +1055,14 @@ private:
         VkDescriptorPoolSize{
             .type = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
             .descriptorCount =
-                static_cast<uint32_t>(swapchain_.images().size()),
+                static_cast<uint32_t>(swapchain_.images().size()) * 4,
         }};
 
     const VkDescriptorPoolCreateInfo create_info = {
         .sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO,
         .maxSets = static_cast<uint32_t>(swapchain_.images().size()),
-        .poolSizeCount = static_cast<uint32_t>(poolSizes.size()),
-        .pPoolSizes = poolSizes.data(),
+        .poolSizeCount = static_cast<uint32_t>(pool_sizes.size()),
+        .pPoolSizes = pool_sizes.data(),
     };
 
     VKH_CHECK(vkCreateDescriptorPool(device_.device(), &create_info, nullptr,
@@ -1052,18 +1086,36 @@ private:
 
     for (size_t i = 0; i < swapchain_.images().size(); i++) {
       const VkDescriptorBufferInfo buffer_info = {
-          .buffer = uniform_buffers_[i],
+          .buffer = uniform_buffers_[i].get(),
           .offset = 0,
           .range = sizeof(UniformBufferObject),
       };
 
-      const VkDescriptorImageInfo image_info = {
-          .sampler = texture_sampler_,
-          .imageView = texture_image_view_,
+      const VkDescriptorImageInfo albedo_texture_image_info = {
+          .sampler = albedo_texture_.sampler,
+          .imageView = albedo_texture_.image_view,
           .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
       };
 
-      const std::array descriptor_writes = {
+      const VkDescriptorImageInfo normal_texture_image_info = {
+          .sampler = normal_texture_.sampler,
+          .imageView = normal_texture_.image_view,
+          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      };
+
+      const VkDescriptorImageInfo metallic_texture_image_info = {
+          .sampler = metallic_texture_.sampler,
+          .imageView = metallic_texture_.image_view,
+          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      };
+
+      const VkDescriptorImageInfo roughness_texture_image_info = {
+          .sampler = roughness_texture_.sampler,
+          .imageView = roughness_texture_.image_view,
+          .imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+      };
+
+      const std::array write_descriptor_set = {
           VkWriteDescriptorSet{
               .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
               .dstSet = descriptor_sets_[i],
@@ -1080,12 +1132,39 @@ private:
               .dstArrayElement = 0,
               .descriptorCount = 1,
               .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-              .pImageInfo = &image_info,
+              .pImageInfo = &albedo_texture_image_info,
+          },
+          VkWriteDescriptorSet{
+              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+              .dstSet = descriptor_sets_[i],
+              .dstBinding = 2,
+              .dstArrayElement = 0,
+              .descriptorCount = 1,
+              .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              .pImageInfo = &normal_texture_image_info,
+          },
+          VkWriteDescriptorSet{
+              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+              .dstSet = descriptor_sets_[i],
+              .dstBinding = 3,
+              .dstArrayElement = 0,
+              .descriptorCount = 1,
+              .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              .pImageInfo = &metallic_texture_image_info,
+          },
+          VkWriteDescriptorSet{
+              .sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET,
+              .dstSet = descriptor_sets_[i],
+              .dstBinding = 4,
+              .dstArrayElement = 0,
+              .descriptorCount = 1,
+              .descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
+              .pImageInfo = &roughness_texture_image_info,
           }};
 
       vkUpdateDescriptorSets(device_.device(),
-                             static_cast<uint32_t>(descriptor_writes.size()),
-                             descriptor_writes.data(), 0, nullptr);
+                             static_cast<uint32_t>(write_descriptor_set.size()),
+                             write_descriptor_set.data(), 0, nullptr);
     }
   }
 
@@ -1149,12 +1228,12 @@ private:
       vkCmdBindPipeline(command_buffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
                         graphics_pipeline_);
 
-      VkBuffer vertex_buffers[] = {mesh_.vertex_buffer};
+      VkBuffer vertex_buffers[] = {mesh_.vertex_buffer.get()};
       VkDeviceSize offsets[] = {0};
       vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, vertex_buffers,
                              offsets);
 
-      vkCmdBindIndexBuffer(command_buffers_[i], mesh_.index_buffer, 0,
+      vkCmdBindIndexBuffer(command_buffers_[i], mesh_.index_buffer.get(), 0,
                            VK_INDEX_TYPE_UINT32);
 
       vkCmdBindDescriptorSets(command_buffers_[i],

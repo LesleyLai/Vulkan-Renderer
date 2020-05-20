@@ -1,15 +1,40 @@
 #version 450
 #extension GL_ARB_separate_shader_objects : enable
 
-layout(binding = 1) uniform sampler2D texSampler;
+layout(binding = 1) uniform sampler2D albedoMapSampler;
+layout(binding = 2) uniform sampler2D normalMapSampler;
+layout(binding = 3) uniform sampler2D metallicMapSampler;
+layout(binding = 4) uniform sampler2D roughnessMapSampler;
 
-layout(location = 0) in vec3 fragPos;
+layout(location = 0) in vec3 fragWorldPos;
 layout(location = 1) in vec3 fragNormal;
 layout(location = 2) in vec2 fragTexCoord;
 
 layout(location = 0) out vec4 outColor;
 
 const float PI = 3.1415926;
+
+const vec3 camPos = vec3(2.0, 2.0, 2.0);
+
+
+vec3 getNormalFromMap()
+{
+    //    vec3 tangentNormal = texture(normalMapSampler, fragTexCoord).xyz * 2.0 - 1.0;
+    //
+    //    vec3 Q1  = dFdx(fragWorldPos);
+    //    vec3 Q2  = dFdy(fragWorldPos);
+    //    vec2 st1 = dFdx(fragTexCoord);
+    //    vec2 st2 = dFdy(fragTexCoord);
+    //
+    //    vec3 N   = normalize(fragNormal);
+    //    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
+    //    vec3 B  = -normalize(cross(N, T));
+    //    mat3 TBN = mat3(T, B, N);
+    //
+    //    return normalize(TBN * tangentNormal);
+    return normalize(fragNormal);
+}
+
 
 // point lights
 const vec3 lightPositions[4] = {
@@ -28,8 +53,8 @@ vec3(23.47, 21.31, 20.79)
 };
 
 
-float calculateAttenuation(vec3 fragPos, vec3 lightPos) {
-    vec3 D = lightPos - fragPos;
+float calculateAttenuation(vec3 fragWorldPos, vec3 lightPos) {
+    vec3 D = lightPos - fragWorldPos;
     float distance_square = dot(D, D);
     return 1.0 / distance_square;
 }
@@ -39,10 +64,6 @@ vec3 schlick(float cosTheta, vec3 F0)
 {
     return F0 + (1.0 - F0) * pow(1.0 - cosTheta, 5.0);
 }
-
-const float metallic = 0.9;
-const float roughness = 0.2;
-const float ao = 0.01;
 
 float DistributionGGX(vec3 N, vec3 H, float roughness)
 {
@@ -78,13 +99,16 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
     return ggx1 * ggx2;
 }
 
-vec3 camPos = vec3(2.0, 2.0, 2.0);
 
 void main() {
-    vec3 N = normalize(fragNormal);
-    vec3 V = normalize(camPos - fragPos);
+    vec3 albedo = pow(texture(albedoMapSampler, fragTexCoord).rgb, vec3(2.2));
+    float metallic = texture(metallicMapSampler, fragTexCoord).r;
+    float roughness = texture(roughnessMapSampler, fragTexCoord).r;
+    const float ao = 0.01;
 
-    vec3 albedo = texture(texSampler, fragTexCoord).xyz;
+    vec3 N = getNormalFromMap();
+    vec3 V = normalize(camPos - fragWorldPos);
+
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
@@ -92,10 +116,10 @@ void main() {
     vec3 Lo = vec3(0.0);
     for (int i = 0; i < 4; ++i) {
 
-        vec3 L = normalize(lightPositions[i] - fragPos);
+        vec3 L = normalize(lightPositions[i] - fragWorldPos);
         vec3 H = normalize(V + L);
 
-        float attenuation = calculateAttenuation(fragPos, lightPositions[i]);
+        float attenuation = calculateAttenuation(fragWorldPos, lightPositions[i]);
         vec3 radiance = lightPower[i] * attenuation;
 
         // Cook-Torrance BRDF

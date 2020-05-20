@@ -43,8 +43,8 @@ auto create_vertex_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
                                 VMA_MEMORY_USAGE_GPU_ONLY)
           .value();
 
-  vkh::copy_buffer(device, command_pool, queue, staging_buffer, vertex_buffer,
-                   buffer_size);
+  vkh::copy_buffer(device, command_pool, queue, staging_buffer.get(),
+                   vertex_buffer.get(), buffer_size);
 
   return vertex_buffer;
 }
@@ -74,8 +74,8 @@ auto create_index_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
                                 VMA_MEMORY_USAGE_GPU_ONLY)
           .value();
 
-  vkh::copy_buffer(device, command_pool, queue, staging_buffer, index_buffer,
-                   buffer_size);
+  vkh::copy_buffer(device, command_pool, queue, staging_buffer.get(),
+                   index_buffer.get(), buffer_size);
 
   return index_buffer;
 }
