@@ -6,35 +6,14 @@ layout(binding = 2) uniform sampler2D normalMapSampler;
 layout(binding = 3) uniform sampler2D metallicMapSampler;
 layout(binding = 4) uniform sampler2D roughnessMapSampler;
 
-layout(location = 0) in vec3 fragWorldPos;
-layout(location = 1) in vec3 fragNormal;
-layout(location = 2) in vec2 fragTexCoord;
+layout(location = 0) in vec3 WorldPos;
+layout(location = 1) in vec3 Normal;
+layout(location = 2) in vec2 TexCoord;
+layout(location = 3) in vec3 CameraPos;
 
 layout(location = 0) out vec4 outColor;
 
-const float PI = 3.1415926;
-
-const vec3 camPos = vec3(2.0, 2.0, 2.0);
-
-
-vec3 getNormalFromMap()
-{
-    //    vec3 tangentNormal = texture(normalMapSampler, fragTexCoord).xyz * 2.0 - 1.0;
-    //
-    //    vec3 Q1  = dFdx(fragWorldPos);
-    //    vec3 Q2  = dFdy(fragWorldPos);
-    //    vec2 st1 = dFdx(fragTexCoord);
-    //    vec2 st2 = dFdy(fragTexCoord);
-    //
-    //    vec3 N   = normalize(fragNormal);
-    //    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
-    //    vec3 B  = -normalize(cross(N, T));
-    //    mat3 TBN = mat3(T, B, N);
-    //
-    //    return normalize(TBN * tangentNormal);
-    return normalize(fragNormal);
-}
-
+const float PI = 3.14159265359;
 
 // point lights
 const vec3 lightPositions[4] = {
@@ -52,9 +31,29 @@ vec3(23.47, 21.31, 20.79),
 vec3(23.47, 21.31, 20.79)
 };
 
+// See http://www.thetenthplanet.de/archives/1180
+vec3 getNormalFromMap()
+{
+    //    vec3 tangentNormal = texture(normalMapSampler, TexCoord).xyz * 2.0 - 1.0;
+    //
+    //    vec3 Q1  = dFdx(WorldPos);
+    //    vec3 Q2  = dFdy(WorldPos);
+    //    vec2 st1 = dFdx(TexCoord);
+    //    vec2 st2 = dFdy(TexCoord);
+    //
+    //    vec3 N   = normalize(Normal);
+    //    vec3 T  = normalize(Q1*st2.t - Q2*st1.t);
+    //    vec3 B  = -normalize(cross(N, T));
+    //    mat3 TBN = mat3(T, B, N);
+    //
+    //    return normalize(TBN * tangentNormal);
 
-float calculateAttenuation(vec3 fragWorldPos, vec3 lightPos) {
-    vec3 D = lightPos - fragWorldPos;
+    return Normal;
+}
+
+
+float calculateAttenuation(vec3 WorldPos, vec3 lightPos) {
+    vec3 D = lightPos - WorldPos;
     float distance_square = dot(D, D);
     return 1.0 / distance_square;
 }
@@ -101,14 +100,13 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 
 
 void main() {
-    vec3 albedo = pow(texture(albedoMapSampler, fragTexCoord).rgb, vec3(2.2));
-    float metallic = texture(metallicMapSampler, fragTexCoord).r;
-    float roughness = texture(roughnessMapSampler, fragTexCoord).r;
+    vec3 albedo = pow(texture(albedoMapSampler, TexCoord).rgb, vec3(2.2));
+    float metallic = texture(metallicMapSampler, TexCoord).r;
+    float roughness = texture(roughnessMapSampler, TexCoord).r;
     const float ao = 0.01;
 
     vec3 N = getNormalFromMap();
-    vec3 V = normalize(camPos - fragWorldPos);
-
+    vec3 V = normalize(CameraPos - WorldPos);
 
     vec3 F0 = vec3(0.04);
     F0 = mix(F0, albedo, metallic);
@@ -116,21 +114,21 @@ void main() {
     vec3 Lo = vec3(0.0);
     for (int i = 0; i < 4; ++i) {
 
-        vec3 L = normalize(lightPositions[i] - fragWorldPos);
+        vec3 L = normalize(lightPositions[i] - WorldPos);
         vec3 H = normalize(V + L);
 
-        float attenuation = calculateAttenuation(fragWorldPos, lightPositions[i]);
+        float attenuation = calculateAttenuation(WorldPos, lightPositions[i]);
         vec3 radiance = lightPower[i] * attenuation;
 
         // Cook-Torrance BRDF
         // {
 
-        vec3 F  = schlick(max(dot(H, V), 0.0), F0);
         float NDF = DistributionGGX(N, H, roughness);
         float G   = GeometrySmith(N, V, L, roughness);
+        vec3 F  = schlick(max(dot(H, V), 0.0), F0);
 
         vec3 numerator    = NDF * G * F;
-        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0);
+        float denominator = 4.0 * max(dot(N, V), 0.0) * max(dot(N, L), 0.0) + 0.001;// 0.001 to prevent divide by zero.;
         vec3 specular     = numerator / max(denominator, 0.001);
         // }
 

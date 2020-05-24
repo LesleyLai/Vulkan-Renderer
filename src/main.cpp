@@ -6,6 +6,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/glm.hpp>
 #include <glm/gtc/matrix_transform.hpp>
+#include <glm/gtx/rotate_vector.hpp>
 
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
@@ -53,6 +54,7 @@ struct UniformBufferObject {
   glm::mat4 model;
   glm::mat4 view;
   glm::mat4 proj;
+  glm::vec3 camera_pos;
 };
 
 auto generate_uv_sphere(vkh::GPUDevice& device, VkCommandPool command_pool,
@@ -190,8 +192,8 @@ private:
   std::vector<VkFence> images_in_flight_;
   size_t current_frame_ = 0;
 
-  beyond::Radian rotation_x_{0.0f};
-  beyond::Radian rotation_z_{0.0f};
+  glm::vec3 camera_pos_{2.0f, 2.0f, 2.0f};
+  glm::vec3 up_{0.0f, 0.0f, 1.0f};
 
   bool framebuffer_resized_ = false;
 
@@ -208,7 +210,9 @@ private:
   {
     using namespace beyond::literals;
 
-    auto* app =
+    const glm::vec3 up{0.0f, 0.0f, 1.0f};
+
+    [[maybe_unused]] auto* app =
         beyond::bit_cast<Application*>(glfwGetWindowUserPointer(window));
 
     switch (action) {
@@ -216,17 +220,27 @@ private:
       [[fallthrough]];
     case GLFW_REPEAT:
       switch (key) {
-      case GLFW_KEY_W:
-        app->rotation_x_ -= 0.1_rad;
-        break;
-      case GLFW_KEY_S:
-        app->rotation_x_ += 0.1_rad;
-        break;
+      case GLFW_KEY_W: {
+        const auto axis =
+            glm::normalize(glm::cross(app->camera_pos_, app->up_));
+        app->camera_pos_ =
+            glm::rotate(app->camera_pos_, (0.1_rad).value(), axis);
+        app->up_ = glm::rotate(app->up_, (0.1_rad).value(), axis);
+      } break;
+      case GLFW_KEY_S: {
+        const auto axis =
+            glm::normalize(glm::cross(app->camera_pos_, app->up_));
+        app->camera_pos_ =
+            glm::rotate(app->camera_pos_, (-0.1_rad).value(), axis);
+        app->up_ = glm::rotate(app->up_, (-0.1_rad).value(), axis);
+      } break;
       case GLFW_KEY_A:
-        app->rotation_z_ -= 0.1_rad;
+        app->camera_pos_ =
+            glm::rotate(app->camera_pos_, (0.1_rad).value(), app->up_);
         break;
       case GLFW_KEY_D:
-        app->rotation_z_ += 0.1_rad;
+        app->camera_pos_ =
+            glm::rotate(app->camera_pos_, (-0.1_rad).value(), app->up_);
         break;
       default:
         break;
@@ -673,8 +687,7 @@ private:
 
   void create_color_resources()
   {
-    VkFormat color_format = swapchain_.image_format();
-
+    const VkFormat color_format = swapchain_.image_format();
     create_image(swapchain_.extent().width, swapchain_.extent().height, 1,
                  device_.msaa_sample_count(), color_format,
                  VK_IMAGE_TILING_OPTIMAL,
@@ -1277,19 +1290,14 @@ private:
   void update_uniform_buffer(uint32_t current_image)
   {
     const UniformBufferObject ubo = {
-        .model = glm::rotate(glm::mat4(1.0f), rotation_z_.value(),
-                             glm::vec3(0.0f, 0.0f, 1.0f)) *
-                 glm::rotate(glm::mat4(1.0f), rotation_x_.value(),
-                             glm::vec3(1.0f, 0.0f, 0.0f)),
-        .view = glm::lookAt(glm::vec3(2.0f, 2.0f, 2.0f),
-                            glm::vec3(0.0f, 0.0f, 0.0f),
-                            glm::vec3(0.0f, 0.0f, 1.0f)),
+        .model = glm::mat4(1.0f),
+        .view = glm::lookAt(camera_pos_, glm::vec3(0.0f, 0.0f, 0.0f), up_),
         .proj =
             glm::perspective(glm::radians(45.0f),
                              static_cast<float>(swapchain_.extent().width) /
                                  static_cast<float>(swapchain_.extent().height),
                              0.1f, 10.0f),
-    };
+        .camera_pos = camera_pos_};
 
     void* data = nullptr;
     uniform_buffers_[current_image].map(&data);
