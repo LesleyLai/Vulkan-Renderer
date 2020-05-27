@@ -100,6 +100,7 @@ float GeometrySmith(vec3 N, vec3 V, vec3 L, float roughness)
 
 
 void main() {
+
     vec3 albedo = pow(texture(albedoMapSampler, TexCoord).rgb, vec3(2.2));
     float metallic = texture(metallicMapSampler, TexCoord).r;
     float roughness = texture(roughnessMapSampler, TexCoord).r;

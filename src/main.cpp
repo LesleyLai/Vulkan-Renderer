@@ -11,7 +11,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #include <stb_image.h>
 
-#include "mesh.hpp"
+#include "model.hpp"
 
 #include "vulkan_helper/buffer.hpp"
 #include "vulkan_helper/check.hpp"
@@ -45,8 +45,6 @@
 
 constexpr int init_width = 800;
 constexpr int init_height = 600;
-
-constexpr const char* model_path = "models/chalet.obj";
 
 constexpr int max_frames_in_flight = 2;
 
@@ -178,7 +176,8 @@ private:
   Texture metallic_texture_{};
   Texture roughness_texture_{};
 
-  StaticMesh mesh_;
+  Model model_;
+  // StaticMesh mesh_;
   std::vector<vkh::UniqueBuffer> uniform_buffers_;
 
   VkDescriptorPool descriptor_pool_{};
@@ -258,9 +257,11 @@ private:
     create_descriptor_set_layout();
     create_graphics_pipeline();
     create_command_pool();
+
     create_color_resources();
     create_depth_resources();
     create_framebuffers();
+
     albedo_texture_ = create_texture_image(
         "textures/rustediron1-alt2-bl/rustediron2_basecolor.png");
     normal_texture_ = create_texture_image(
@@ -270,8 +271,11 @@ private:
     roughness_texture_ = create_texture_image(
         "textures/rustediron1-alt2-bl/rustediron2_roughness.png");
 
-    mesh_ = generate_uv_sphere(device_, graphics_command_pool_,
-                               device_.graphics_queue());
+    model_ = Model::load(device_, graphics_command_pool_,
+                         device_.graphics_queue(), "models/DamagedHelmet.gltf");
+
+    std::cout << model_.meshes().size() << std::endl;
+
     create_uniform_buffers();
     create_descriptor_pool();
     create_descriptor_sets();
@@ -326,8 +330,8 @@ private:
     vkDestroyDescriptorSetLayout(device_.device(), descriptor_set_layout_,
                                  nullptr);
 
-    mesh_.index_buffer.reset();
-    mesh_.vertex_buffer.reset();
+    //    mesh_.index_buffer.reset();
+    //    mesh_.vertex_buffer.reset();
 
     for (size_t i = 0; i < max_frames_in_flight; i++) {
       vkDestroySemaphore(device_.device(), render_finished_semaphores_[i],
@@ -552,7 +556,7 @@ private:
 
     const VkPipelineInputAssemblyStateCreateInfo input_assembly = {
         .sType = VK_STRUCTURE_TYPE_PIPELINE_INPUT_ASSEMBLY_STATE_CREATE_INFO,
-        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_STRIP,
+        .topology = VK_PRIMITIVE_TOPOLOGY_TRIANGLE_LIST,
         .primitiveRestartEnable = VK_FALSE};
 
     const VkViewport viewport = {
@@ -1213,11 +1217,13 @@ private:
     VKH_CHECK(vkAllocateCommandBuffers(device_.device(), &alloc_info,
                                        command_buffers_.data()));
 
-    for (size_t i = 0; i < command_buffers_.size(); i++) {
+    for (size_t i = 0; i < command_buffers_.size(); ++i) {
+      const auto command_buffer = command_buffers_[i];
+
       VkCommandBufferBeginInfo begin_info = {
           .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO};
 
-      VKH_CHECK(vkBeginCommandBuffer(command_buffers_[i], &begin_info));
+      VKH_CHECK(vkBeginCommandBuffer(command_buffer, &begin_info));
 
       constexpr std::array clear_values = {
           VkClearValue{.color = {{0.0f, 0.0f, 0.0f, 1.0f}}},
@@ -1235,28 +1241,29 @@ private:
           .pClearValues = clear_values.data(),
       };
 
-      vkCmdBeginRenderPass(command_buffers_[i], &render_pass_begin_info,
+      vkCmdBeginRenderPass(command_buffer, &render_pass_begin_info,
                            VK_SUBPASS_CONTENTS_INLINE);
 
-      vkCmdBindPipeline(command_buffers_[i], VK_PIPELINE_BIND_POINT_GRAPHICS,
+      vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
                         graphics_pipeline_);
 
-      VkBuffer vertex_buffers[] = {mesh_.vertex_buffer.get()};
-      VkDeviceSize offsets[] = {0};
-      vkCmdBindVertexBuffers(command_buffers_[i], 0, 1, vertex_buffers,
-                             offsets);
+      const auto& mesh = model_.meshes()[0];
 
-      vkCmdBindIndexBuffer(command_buffers_[i], mesh_.index_buffer.get(), 0,
+      VkBuffer vertex_buffers[] = {mesh.vertex_buffer.get()};
+      VkDeviceSize offsets[] = {0};
+      vkCmdBindVertexBuffers(command_buffer, 0, 1, vertex_buffers, offsets);
+
+      vkCmdBindIndexBuffer(command_buffer, mesh.index_buffer.get(), 0,
                            VK_INDEX_TYPE_UINT32);
 
-      vkCmdBindDescriptorSets(command_buffers_[i],
-                              VK_PIPELINE_BIND_POINT_GRAPHICS, pipeline_layout_,
-                              0, 1, &descriptor_sets_[i], 0, nullptr);
+      vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_GRAPHICS,
+                              pipeline_layout_, 0, 1, &descriptor_sets_[i], 0,
+                              nullptr);
 
-      vkCmdDrawIndexed(command_buffers_[i], mesh_.indices_size, 1, 0, 0, 0);
-      vkCmdEndRenderPass(command_buffers_[i]);
+      vkCmdDrawIndexed(command_buffer, mesh.indices_size, 1, 0, 0, 0);
+      vkCmdEndRenderPass(command_buffer);
 
-      VKH_CHECK(vkEndCommandBuffer(command_buffers_[i]));
+      VKH_CHECK(vkEndCommandBuffer(command_buffer));
     }
   }
 
