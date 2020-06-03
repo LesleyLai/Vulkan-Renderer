@@ -66,11 +66,6 @@ struct StaticMesh {
   std::uint32_t indices_size;
 };
 
-[[nodiscard]] auto create_mesh_from_file(vkh::GPUDevice& device,
-                                         VkCommandPool command_pool,
-                                         VkQueue queue, const char* path)
-    -> StaticMesh;
-
 [[nodiscard]] auto
 create_mesh_from_data(vkh::GPUDevice& device, VkCommandPool command_pool,
                       VkQueue queue, gsl::span<Vertex> vertices,

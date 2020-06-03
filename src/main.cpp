@@ -848,7 +848,7 @@ private:
     vkh::execute_single_time_command(
         device_.device(), graphics_command_pool_, device_.graphics_queue(),
         [&](VkCommandBuffer command_buffer) {
-          VkImageMemoryBarrier barrier = {
+          VkImageMemoryBarrier barrier{
               .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
               .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
               .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -978,7 +978,7 @@ private:
     vkh::execute_single_time_command(
         device_.device(), graphics_command_pool_, device_.graphics_queue(),
         [&](VkCommandBuffer command_buffer) {
-          VkImageMemoryBarrier barrier = {
+          VkImageMemoryBarrier barrier{
               .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
               .oldLayout = old_layout,
               .newLayout = new_layout,

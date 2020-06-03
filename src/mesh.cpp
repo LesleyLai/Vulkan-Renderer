@@ -2,9 +2,6 @@
 
 #include "mesh.hpp"
 
-#define TINYOBJLOADER_IMPLEMENTATION
-#include <tiny_obj_loader.h>
-
 namespace std {
 template <> struct hash<Vertex> {
   [[nodiscard]] auto operator()(Vertex const& vertex) const noexcept -> size_t
@@ -80,52 +77,6 @@ auto create_index_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
   return index_buffer;
 }
 } // namespace
-
-[[nodiscard]] auto create_mesh_from_file(vkh::GPUDevice& device,
-                                         VkCommandPool command_pool,
-                                         VkQueue queue, const char* path)
-    -> StaticMesh
-{
-  tinyobj::attrib_t attrib;
-  std::vector<tinyobj::shape_t> shapes;
-  std::vector<tinyobj::material_t> materials;
-  std::string err;
-
-  if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &err, path)) {
-    throw std::runtime_error(err);
-  }
-
-  std::unordered_map<Vertex, uint32_t> unique_vertices{};
-
-  std::vector<Vertex> vertices;
-  std::vector<uint32_t> indices;
-
-  for (const auto& shape : shapes) {
-    for (const auto& index : shape.mesh.indices) {
-      Vertex vertex = {
-          .pos =
-              {attrib.vertices[static_cast<size_t>(3 * index.vertex_index + 0)],
-               attrib.vertices[static_cast<size_t>(3 * index.vertex_index + 1)],
-               attrib
-                   .vertices[static_cast<size_t>(3 * index.vertex_index + 2)]},
-          .normal = {1.0f, 1.0f, 1.0f},
-          .tex_coord = {attrib.texcoords[static_cast<size_t>(
-                            2 * index.texcoord_index + 0)],
-                        1.0f - attrib.texcoords[static_cast<size_t>(
-                                   2 * index.texcoord_index + 1)]},
-      };
-
-      if (unique_vertices.count(vertex) == 0) {
-        unique_vertices[vertex] = static_cast<uint32_t>(vertices.size());
-        vertices.push_back(vertex);
-      }
-
-      indices.push_back(unique_vertices[vertex]);
-    }
-  }
-
-  return create_mesh_from_data(device, command_pool, queue, vertices, indices);
-}
 
 [[nodiscard]] auto
 create_mesh_from_data(vkh::GPUDevice& device, VkCommandPool command_pool,

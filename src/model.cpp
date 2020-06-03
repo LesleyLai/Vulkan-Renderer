@@ -10,14 +10,15 @@ namespace {
 
 [[nodiscard]] StaticMesh process_mesh(vkh::GPUDevice& device,
                                       VkCommandPool command_pool, VkQueue queue,
-                                      const aiMesh& mesh,
-                                      const aiScene& /*scene*/)
+                                      const aiMesh& mesh, const aiScene& scene)
 {
   std::vector<Vertex> vertices;
   vertices.reserve(mesh.mNumVertices);
 
   std::vector<uint32_t> indices;
   indices.reserve(mesh.mNumFaces * 3);
+
+  // TODO: Check for null cases
 
   for (uint32_t i = 0; i < mesh.mNumVertices; i++) {
     vertices.push_back(
@@ -31,6 +32,25 @@ namespace {
     const aiFace face = mesh.mFaces[i];
     for (uint32_t j = 0; j < face.mNumIndices; j++)
       indices.push_back(face.mIndices[j]);
+  }
+
+  if (mesh.mMaterialIndex < scene.mNumMaterials) {
+    [[maybe_unused]] aiMaterial* material =
+        scene.mMaterials[mesh.mMaterialIndex];
+
+    aiString diffuse;
+    material->GetTexture(aiTextureType_DIFFUSE, 0, &diffuse);
+    fmt::print("Texture path {}\n", diffuse.C_Str());
+
+    if (const aiTexture* diffuse_texture =
+            scene.GetEmbeddedTexture(diffuse.C_Str());
+        diffuse_texture) {
+    } else {
+      beyond::panic("Cannot load diffuse texture\n");
+    }
+
+  } else {
+    beyond::panic("No material!");
   }
 
   // TODO: Loading materials

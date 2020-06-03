@@ -6,10 +6,12 @@ add_executable(app
         main.cpp
         window.hpp
         window.cpp
-
         utils/vma_source.cpp
         utils/utils.hpp
-        mesh.cpp mesh.hpp model.cpp model.hpp)
+        mesh.cpp
+        mesh.hpp
+        model.cpp
+        model.hpp)
 target_link_libraries(app
         PRIVATE compiler_options
         vulkan_helper
@@ -21,7 +23,6 @@ target_link_libraries(app
         CONAN_PKG::glfw
         CONAN_PKG::glm
         CONAN_PKG::stb
-        CONAN_PKG::tinyobjloader
         )
 
 add_dependencies(app vertShader)
