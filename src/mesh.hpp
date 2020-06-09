@@ -66,9 +66,9 @@ struct StaticMesh {
   std::uint32_t indices_size;
 };
 
-[[nodiscard]] auto
-create_mesh_from_data(vkh::GPUDevice& device, VkCommandPool command_pool,
-                      VkQueue queue, gsl::span<Vertex> vertices,
-                      gsl::span<uint32_t> indices) -> StaticMesh;
+[[nodiscard]] auto create_mesh_from_data(vkh::GPUDevice& device,
+                                         gsl::span<Vertex> vertices,
+                                         gsl::span<uint32_t> indices)
+    -> StaticMesh;
 
 #endif // VULKAN_RENDERER_MESH_HPP

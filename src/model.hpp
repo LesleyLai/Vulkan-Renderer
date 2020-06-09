@@ -21,9 +21,8 @@ public:
     return meshes_;
   }
 
-  [[nodiscard]] static auto load(vkh::GPUDevice& device,
-                                 VkCommandPool command_pool, VkQueue queue,
-                                 const char* path) -> Model;
+  [[nodiscard]] static auto load(vkh::GPUDevice& device, const char* path)
+      -> Model;
 };
 
 #endif // VULKAN_RENDERER_MODEL_HPP

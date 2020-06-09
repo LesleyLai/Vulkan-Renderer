@@ -117,10 +117,22 @@ GPUDevice::GPUDevice(Window& window,
   if (vmaCreateAllocator(&allocator_info, &allocator_) != VK_SUCCESS) {
     beyond::panic("Cannot create vma allocator");
   }
+
+  const VkCommandPoolCreateInfo create_info = {
+      .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
+      .queueFamilyIndex = queue_family_indices_.graphics_family,
+  };
+
+  if (vkCreateCommandPool(device_, &create_info, nullptr,
+                          &graphics_command_pool_) != VK_SUCCESS) {
+    beyond::panic("Cannot create graphics command pool");
+  }
 }
 
 GPUDevice::~GPUDevice() noexcept
 {
+  vkDestroyCommandPool(device_, graphics_command_pool_, nullptr);
+
   vmaDestroyAllocator(allocator_);
   vkDestroyDevice(device_, nullptr);
 

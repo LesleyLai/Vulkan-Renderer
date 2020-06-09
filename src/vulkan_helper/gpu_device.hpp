@@ -36,6 +36,8 @@ class GPUDevice {
 
   VmaAllocator allocator_{};
 
+  VkCommandPool graphics_command_pool_;
+
 public:
   explicit GPUDevice(Window& window,
                      ValidationLayerSetting validation_layer_setting =
@@ -97,6 +99,11 @@ public:
       -> const QueueFamilyIndices&
   {
     return queue_family_indices_;
+  }
+
+  [[nodiscard]] auto graphics_command_pool() const noexcept -> VkCommandPool
+  {
+    return graphics_command_pool_;
   }
 
   auto wait_idle() const noexcept -> void;

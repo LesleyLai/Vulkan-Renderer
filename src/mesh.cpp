@@ -15,8 +15,7 @@ template <> struct hash<Vertex> {
 } // namespace std
 
 namespace {
-auto create_vertex_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
-                          VkQueue queue, gsl::span<Vertex> vertices)
+auto create_vertex_buffer(vkh::GPUDevice& device, gsl::span<Vertex> vertices)
     -> vkh::UniqueBuffer
 {
   VkDeviceSize buffer_size =
@@ -40,14 +39,13 @@ auto create_vertex_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
                                 VMA_MEMORY_USAGE_GPU_ONLY)
           .value();
 
-  vkh::copy_buffer(device, command_pool, queue, staging_buffer.get(),
-                   vertex_buffer.get(), buffer_size);
+  vkh::copy_buffer(device, staging_buffer.get(), vertex_buffer.get(),
+                   buffer_size);
 
   return vertex_buffer;
 }
 
-auto create_index_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
-                         VkQueue queue, gsl::span<uint32_t> indices)
+auto create_index_buffer(vkh::GPUDevice& device, gsl::span<uint32_t> indices)
     -> vkh::UniqueBuffer
 {
   VkDeviceSize buffer_size =
@@ -71,21 +69,19 @@ auto create_index_buffer(vkh::GPUDevice& device, VkCommandPool command_pool,
                                 VMA_MEMORY_USAGE_GPU_ONLY)
           .value();
 
-  vkh::copy_buffer(device, command_pool, queue, staging_buffer.get(),
-                   index_buffer.get(), buffer_size);
+  vkh::copy_buffer(device, staging_buffer.get(), index_buffer.get(),
+                   buffer_size);
 
   return index_buffer;
 }
 } // namespace
 
-[[nodiscard]] auto
-create_mesh_from_data(vkh::GPUDevice& device, VkCommandPool command_pool,
-                      VkQueue queue, gsl::span<Vertex> vertices,
-                      gsl::span<uint32_t> indices) -> StaticMesh
+[[nodiscard]] auto create_mesh_from_data(vkh::GPUDevice& device,
+                                         gsl::span<Vertex> vertices,
+                                         gsl::span<uint32_t> indices)
+    -> StaticMesh
 {
-  return StaticMesh{
-      .vertex_buffer =
-          create_vertex_buffer(device, command_pool, queue, vertices),
-      .index_buffer = create_index_buffer(device, command_pool, queue, indices),
-      .indices_size = static_cast<uint32_t>(indices.size())};
+  return StaticMesh{.vertex_buffer = create_vertex_buffer(device, vertices),
+                    .index_buffer = create_index_buffer(device, indices),
+                    .indices_size = static_cast<uint32_t>(indices.size())};
 }

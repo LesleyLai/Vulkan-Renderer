@@ -9,7 +9,6 @@
 namespace {
 
 [[nodiscard]] StaticMesh process_mesh(vkh::GPUDevice& device,
-                                      VkCommandPool command_pool, VkQueue queue,
                                       const aiMesh& mesh, const aiScene& scene)
 {
   std::vector<Vertex> vertices;
@@ -56,12 +55,11 @@ namespace {
 
   // TODO: Loading materials
 
-  return create_mesh_from_data(device, command_pool, queue, vertices, indices);
+  return create_mesh_from_data(device, vertices, indices);
 }
 
-auto process_node(vkh::GPUDevice& device, VkCommandPool command_pool,
-                  VkQueue queue, const aiNode& node, const aiScene& scene,
-                  std::vector<StaticMesh>& meshes) -> void
+auto process_node(vkh::GPUDevice& device, const aiNode& node,
+                  const aiScene& scene, std::vector<StaticMesh>& meshes) -> void
 {
   fmt::print("Node: {}\n", node.mName.C_Str());
 
@@ -69,21 +67,19 @@ auto process_node(vkh::GPUDevice& device, VkCommandPool command_pool,
     [[maybe_unused]] const aiMesh& mesh = *scene.mMeshes[node.mMeshes[i]];
     fmt::print("Mesh: {}\n", mesh.mName.C_Str());
 
-    meshes.push_back(process_mesh(device, command_pool, queue, mesh, scene));
+    meshes.push_back(process_mesh(device, mesh, scene));
   }
 
   // then do the same for each of its children
   for (uint32_t i = 0; i < node.mNumChildren; ++i) {
-    process_node(device, command_pool, queue, *node.mChildren[i], scene,
-                 meshes);
+    process_node(device, *node.mChildren[i], scene, meshes);
   }
 }
 
 } // namespace
 
-[[nodiscard]] auto Model::load(vkh::GPUDevice& device,
-                               VkCommandPool command_pool, VkQueue queue,
-                               const char* path) -> Model
+[[nodiscard]] auto Model::load(vkh::GPUDevice& device, const char* path)
+    -> Model
 {
   Assimp::Importer importer;
   const aiScene* scene =
@@ -96,7 +92,7 @@ auto process_node(vkh::GPUDevice& device, VkCommandPool command_pool,
   // directory = path.substr(0, path.find_last_of('/'));
 
   std::vector<StaticMesh> meshes;
-  process_node(device, command_pool, queue, *scene->mRootNode, *scene, meshes);
+  process_node(device, *scene->mRootNode, *scene, meshes);
 
   return Model{std::move(meshes)};
 }

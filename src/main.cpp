@@ -55,13 +55,12 @@ struct UniformBufferObject {
   glm::vec3 camera_pos;
 };
 
-void transition_image_layout(vkh::GPUDevice& device, VkCommandPool command_pool,
-                             VkImage image, VkFormat /*format*/,
-                             VkImageLayout old_layout, VkImageLayout new_layout,
-                             uint32_t mip_levels)
+void transition_image_layout(vkh::GPUDevice& device, VkImage image,
+                             VkFormat /*format*/, VkImageLayout old_layout,
+                             VkImageLayout new_layout, uint32_t mip_levels)
 {
   vkh::execute_single_time_command(
-      device.device(), command_pool, device.graphics_queue(),
+      device.device(), device.graphics_command_pool(), device.graphics_queue(),
       [&](VkCommandBuffer command_buffer) {
         VkImageMemoryBarrier barrier{
             .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
@@ -104,12 +103,11 @@ void transition_image_layout(vkh::GPUDevice& device, VkCommandPool command_pool,
       });
 }
 
-void copy_buffer_to_image(vkh::GPUDevice& device, VkCommandPool command_pool,
-                          VkBuffer buffer, VkImage image, uint32_t width,
-                          uint32_t height)
+void copy_buffer_to_image(vkh::GPUDevice& device, VkBuffer buffer,
+                          VkImage image, uint32_t width, uint32_t height)
 {
   vkh::execute_single_time_command(
-      device.device(), command_pool, device.graphics_queue(),
+      device.device(), device.graphics_command_pool(), device.graphics_queue(),
       [&](VkCommandBuffer command_buffer) {
         const VkBufferImageCopy region = {
             .bufferOffset = 0,
@@ -132,8 +130,7 @@ void copy_buffer_to_image(vkh::GPUDevice& device, VkCommandPool command_pool,
       });
 }
 
-auto generate_uv_sphere(vkh::GPUDevice& device, VkCommandPool command_pool,
-                        VkQueue queue) -> StaticMesh
+auto generate_uv_sphere(vkh::GPUDevice& device) -> StaticMesh
 {
   std::vector<Vertex> vertices;
   std::vector<uint32_t> indices;
@@ -186,7 +183,7 @@ auto generate_uv_sphere(vkh::GPUDevice& device, VkCommandPool command_pool,
     odd_row = !odd_row;
   }
 
-  return create_mesh_from_data(device, command_pool, queue, vertices, indices);
+  return create_mesh_from_data(device, vertices, indices);
 }
 
 struct Texture {
@@ -237,8 +234,6 @@ private:
   VkDescriptorSetLayout descriptor_set_layout_{};
   VkPipelineLayout pipeline_layout_{};
   VkPipeline graphics_pipeline_{};
-
-  VkCommandPool graphics_command_pool_{};
 
   VkImage color_image_{};
   VmaAllocation color_image_memory_{};
@@ -333,7 +328,6 @@ private:
     create_render_pass();
     create_descriptor_set_layout();
     create_graphics_pipeline();
-    create_command_pool();
 
     create_color_resources();
     create_depth_resources();
@@ -348,8 +342,7 @@ private:
     roughness_texture_ = create_texture_image(
         "textures/rustediron1-alt2-bl/rustediron2_roughness.png");
 
-    model_ = Model::load(device_, graphics_command_pool_,
-                         device_.graphics_queue(), "models/DamagedHelmet.gltf");
+    model_ = Model::load(device_, "models/DamagedHelmet.gltf");
 
     std::cout << model_.meshes().size() << std::endl;
 
@@ -374,7 +367,7 @@ private:
 
     swapchain_.reset();
 
-    vkFreeCommandBuffers(device_.device(), graphics_command_pool_,
+    vkFreeCommandBuffers(device_.device(), device_.graphics_command_pool(),
                          static_cast<uint32_t>(command_buffers_.size()),
                          command_buffers_.data());
 
@@ -414,8 +407,6 @@ private:
                          nullptr);
       vkDestroyFence(device_.device(), in_flight_fences_[i], nullptr);
     }
-
-    vkDestroyCommandPool(device_.device(), graphics_command_pool_, nullptr);
   }
 
   void recreate_swapchain()
@@ -749,20 +740,6 @@ private:
     }
   }
 
-  void create_command_pool()
-  {
-    const vkh::QueueFamilyIndices queue_family_indices =
-        device_.queue_family_indices();
-
-    const VkCommandPoolCreateInfo create_info = {
-        .sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO,
-        .queueFamilyIndex = queue_family_indices.graphics_family,
-    };
-
-    VKH_CHECK(vkCreateCommandPool(device_.device(), &create_info, nullptr,
-                                  &graphics_command_pool_));
-  }
-
   void create_color_resources()
   {
     const VkFormat color_format = swapchain_.image_format();
@@ -865,12 +842,12 @@ private:
         VMA_MEMORY_USAGE_GPU_ONLY);
     texture.image = std::move(texture_image_res).value();
 
-    transition_image_layout(
-        device_, graphics_command_pool_, texture.image.get(),
-        VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
-        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
-    copy_buffer_to_image(device_, graphics_command_pool_, staging_buffer.get(),
-                         texture.image.get(), static_cast<uint32_t>(tex_width),
+    transition_image_layout(device_, texture.image.get(),
+                            VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
+                            VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+                            texture.mip_levels);
+    copy_buffer_to_image(device_, staging_buffer.get(), texture.image.get(),
+                         static_cast<uint32_t>(tex_width),
                          static_cast<uint32_t>(tex_height));
     // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating
     // mipmaps
@@ -921,8 +898,8 @@ private:
     }
 
     vkh::execute_single_time_command(
-        device_.device(), graphics_command_pool_, device_.graphics_queue(),
-        [&](VkCommandBuffer command_buffer) {
+        device_.device(), device_.graphics_command_pool(),
+        device_.graphics_queue(), [&](VkCommandBuffer command_buffer) {
           VkImageMemoryBarrier barrier{
               .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
               .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
@@ -1209,7 +1186,7 @@ private:
 
     const VkCommandBufferAllocateInfo alloc_info = {
         .sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
-        .commandPool = graphics_command_pool_,
+        .commandPool = device_.graphics_command_pool(),
         .level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
         .commandBufferCount = static_cast<uint32_t>(command_buffers_.size()),
     };

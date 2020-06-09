@@ -39,11 +39,11 @@ auto create_unique_buffer(VmaAllocator allocator, VkDeviceSize size,
       });
 }
 
-void copy_buffer(GPUDevice& device, VkCommandPool command_pool, VkQueue queue,
-                 VkBuffer src_buffer, VkBuffer dst_buffer, VkDeviceSize size)
+void copy_buffer(GPUDevice& device, VkBuffer src_buffer, VkBuffer dst_buffer,
+                 VkDeviceSize size)
 {
   vkh::execute_single_time_command(
-      device.device(), command_pool, queue,
+      device.device(), device.graphics_command_pool(), device.graphics_queue(),
       [&](VkCommandBuffer command_buffer) {
         VkBufferCopy copyRegion = {.size = size};
         vkCmdCopyBuffer(command_buffer, src_buffer, dst_buffer, 1, &copyRegion);
