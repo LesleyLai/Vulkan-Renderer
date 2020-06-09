@@ -55,6 +55,83 @@ struct UniformBufferObject {
   glm::vec3 camera_pos;
 };
 
+void transition_image_layout(vkh::GPUDevice& device, VkCommandPool command_pool,
+                             VkImage image, VkFormat /*format*/,
+                             VkImageLayout old_layout, VkImageLayout new_layout,
+                             uint32_t mip_levels)
+{
+  vkh::execute_single_time_command(
+      device.device(), command_pool, device.graphics_queue(),
+      [&](VkCommandBuffer command_buffer) {
+        VkImageMemoryBarrier barrier{
+            .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
+            .oldLayout = old_layout,
+            .newLayout = new_layout,
+            .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
+            .image = image,
+            .subresourceRange{
+                .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                .baseMipLevel = 0,
+                .levelCount = mip_levels,
+                .baseArrayLayer = 0,
+                .layerCount = 1,
+            }};
+
+        VkPipelineStageFlags source_stage;
+        VkPipelineStageFlags destination_stage;
+
+        if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
+            new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+          barrier.srcAccessMask = 0;
+          barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+          source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+          destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
+                   new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+          barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+          barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+          source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+          destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+        } else {
+          beyond::panic("unsupported layout transition!");
+        }
+
+        vkCmdPipelineBarrier(command_buffer, source_stage, destination_stage, 0,
+                             0, nullptr, 0, nullptr, 1, &barrier);
+      });
+}
+
+void copy_buffer_to_image(vkh::GPUDevice& device, VkCommandPool command_pool,
+                          VkBuffer buffer, VkImage image, uint32_t width,
+                          uint32_t height)
+{
+  vkh::execute_single_time_command(
+      device.device(), command_pool, device.graphics_queue(),
+      [&](VkCommandBuffer command_buffer) {
+        const VkBufferImageCopy region = {
+            .bufferOffset = 0,
+            .bufferRowLength = 0,
+            .bufferImageHeight = 0,
+            .imageSubresource =
+                {
+                    .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
+                    .mipLevel = 0,
+                    .baseArrayLayer = 0,
+                    .layerCount = 1,
+                },
+            .imageOffset = {0, 0, 0},
+            .imageExtent = {width, height, 1},
+        };
+
+        vkCmdCopyBufferToImage(command_buffer, buffer, image,
+                               VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
+                               &region);
+      });
+}
+
 auto generate_uv_sphere(vkh::GPUDevice& device, VkCommandPool command_pool,
                         VkQueue queue) -> StaticMesh
 {
@@ -329,9 +406,6 @@ private:
 
     vkDestroyDescriptorSetLayout(device_.device(), descriptor_set_layout_,
                                  nullptr);
-
-    //    mesh_.index_buffer.reset();
-    //    mesh_.vertex_buffer.reset();
 
     for (size_t i = 0; i < max_frames_in_flight; i++) {
       vkDestroySemaphore(device_.device(), render_finished_semaphores_[i],
@@ -792,10 +866,11 @@ private:
     texture.image = std::move(texture_image_res).value();
 
     transition_image_layout(
-        texture.image.get(), VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
+        device_, graphics_command_pool_, texture.image.get(),
+        VK_FORMAT_R8G8B8A8_SRGB, VK_IMAGE_LAYOUT_UNDEFINED,
         VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, texture.mip_levels);
-    copy_buffer_to_image(staging_buffer.get(), texture.image.get(),
-                         static_cast<uint32_t>(tex_width),
+    copy_buffer_to_image(device_, graphics_command_pool_, staging_buffer.get(),
+                         texture.image.get(), static_cast<uint32_t>(tex_width),
                          static_cast<uint32_t>(tex_height));
     // transitioned to VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL while generating
     // mipmaps
@@ -969,81 +1044,6 @@ private:
     VmaAllocationCreateInfo alloc_info{.usage = VMA_MEMORY_USAGE_GPU_ONLY};
     VKH_CHECK(vmaCreateImage(device_.allocator(), &imageInfo, &alloc_info,
                              &image, &imageMemory, nullptr));
-  }
-
-  void transition_image_layout(VkImage image, VkFormat /*format*/,
-                               VkImageLayout old_layout,
-                               VkImageLayout new_layout, uint32_t mip_levels)
-  {
-    vkh::execute_single_time_command(
-        device_.device(), graphics_command_pool_, device_.graphics_queue(),
-        [&](VkCommandBuffer command_buffer) {
-          VkImageMemoryBarrier barrier{
-              .sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER,
-              .oldLayout = old_layout,
-              .newLayout = new_layout,
-              .srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-              .dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED,
-              .image = image,
-              .subresourceRange{
-                  .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                  .baseMipLevel = 0,
-                  .levelCount = mip_levels,
-                  .baseArrayLayer = 0,
-                  .layerCount = 1,
-              }};
-
-          VkPipelineStageFlags source_stage;
-          VkPipelineStageFlags destination_stage;
-
-          if (old_layout == VK_IMAGE_LAYOUT_UNDEFINED &&
-              new_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
-            barrier.srcAccessMask = 0;
-            barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-
-            source_stage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-            destination_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-          } else if (old_layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL &&
-                     new_layout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
-            barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-            barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-            source_stage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-            destination_stage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-          } else {
-            beyond::panic("unsupported layout transition!");
-          }
-
-          vkCmdPipelineBarrier(command_buffer, source_stage, destination_stage,
-                               0, 0, nullptr, 0, nullptr, 1, &barrier);
-        });
-  }
-
-  void copy_buffer_to_image(VkBuffer buffer, VkImage image, uint32_t width,
-                            uint32_t height)
-  {
-    vkh::execute_single_time_command(
-        device_.device(), graphics_command_pool_, device_.graphics_queue(),
-        [&](VkCommandBuffer command_buffer) {
-          const VkBufferImageCopy region = {
-              .bufferOffset = 0,
-              .bufferRowLength = 0,
-              .bufferImageHeight = 0,
-              .imageSubresource =
-                  {
-                      .aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-                      .mipLevel = 0,
-                      .baseArrayLayer = 0,
-                      .layerCount = 1,
-                  },
-              .imageOffset = {0, 0, 0},
-              .imageExtent = {width, height, 1},
-          };
-
-          vkCmdCopyBufferToImage(command_buffer, buffer, image,
-                                 VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1,
-                                 &region);
-        });
   }
 
   void create_uniform_buffers()

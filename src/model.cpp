@@ -38,13 +38,14 @@ namespace {
     [[maybe_unused]] aiMaterial* material =
         scene.mMaterials[mesh.mMaterialIndex];
 
-    aiString diffuse;
-    material->GetTexture(aiTextureType_DIFFUSE, 0, &diffuse);
-    fmt::print("Texture path {}\n", diffuse.C_Str());
+    aiString diffuse_path;
+    material->GetTexture(aiTextureType_DIFFUSE, 0, &diffuse_path);
+    fmt::print("Texture path {}\n", diffuse_path.C_Str());
 
     if (const aiTexture* diffuse_texture =
-            scene.GetEmbeddedTexture(diffuse.C_Str());
+            scene.GetEmbeddedTexture(diffuse_path.C_Str());
         diffuse_texture) {
+      fmt::print("{}\n", diffuse_texture->mFilename.C_Str());
     } else {
       beyond::panic("Cannot load diffuse texture\n");
     }
