@@ -9,7 +9,7 @@ add_library(vulkan_helper
         unique_resource.hpp
         buffer.cpp buffer.hpp
         single_time_command.hpp single_time_command.cpp
-        image.cpp image.hpp)
+        image.cpp image.hpp image_view.cpp image_view.hpp)
 target_link_libraries(vulkan_helper
         PUBLIC
         beyond::core
