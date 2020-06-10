@@ -11,7 +11,7 @@ add_executable(app
         mesh.cpp
         mesh.hpp
         model.cpp
-        model.hpp)
+        model.hpp texture.cpp texture.hpp)
 target_link_libraries(app
         PRIVATE compiler_options
         vulkan_helper
